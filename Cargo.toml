@@ -1,0 +1,9 @@
+[workspace]
+members = [
+  "psyche-core",
+  "psyche-serde",
+  "psyche-host-core",
+]
+exclude = [
+  "brain-activity",
+]
