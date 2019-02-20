@@ -5,6 +5,9 @@ authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 edition = "2018"
 description = "Serialize/Deserialize module for Psyche AI Toolset"
 license = "MIT"
+homepage = "https://github.com/PsichiX/psyche"
+repository = "https://github.com/PsichiX/psyche"
+documentation = "https://docs.rs/psyche-serde"
 
 [dependencies]
 psyche-core = { version = "0.1", path = "../psyche-core" }
