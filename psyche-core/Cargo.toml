@@ -3,6 +3,8 @@ name = "psyche-core"
 version = "0.1.0"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 edition = "2018"
+description = "Core module for Psyche AI Toolset"
+license = "MIT"
 
 [dependencies]
 uuid = { version = "0.7", features = ["serde", "v4"] }
