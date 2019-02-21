@@ -1,6 +1,6 @@
 [package]
 name = "psyche-core"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 edition = "2018"
 description = "Core module for Psyche AI Toolset"
@@ -13,3 +13,4 @@ documentation = "https://docs.rs/psyche-core"
 uuid = { version = "0.7", features = ["serde", "v4"] }
 rand = "0.5"
 serde = { version = "1.0", features = ["derive"] }
+rayon = "1.0"

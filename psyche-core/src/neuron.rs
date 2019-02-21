@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 pub type NeuronID = ID<Neuron>;
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Serialize, Deserialize)]
+#[repr(C)]
 pub struct Impulse {
     pub value: Scalar,
     pub timeout: Scalar,
@@ -22,6 +23,7 @@ pub(crate) struct Synapse {
 }
 
 #[derive(Debug, Default, Copy, Clone, PartialEq, Serialize, Deserialize)]
+#[repr(C)]
 pub struct Position {
     pub x: Scalar,
     pub y: Scalar,
@@ -53,6 +55,7 @@ impl Position {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[repr(C)]
 pub struct Neuron {
     id: NeuronID,
     owner_id: BrainID,
@@ -124,7 +127,7 @@ impl Neuron {
             .input_impulses
             .iter()
             .filter_map(|impulse| {
-                let mut impulse = impulse.clone();
+                let mut impulse = *impulse;
                 impulse.timeout -= s;
                 if impulse.timeout > 0.0 {
                     Some(impulse)

@@ -1,4 +1,5 @@
 extern crate rand;
+extern crate rayon;
 extern crate serde;
 extern crate uuid;
 

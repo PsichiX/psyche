@@ -2,6 +2,7 @@ use crate::{Scalar, INFINITY};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[repr(C)]
 pub struct Config {
     pub propagation_speed: Scalar,
     pub neuron_impulse_decay: Scalar,

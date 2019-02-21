@@ -7,6 +7,7 @@ use uuid::Uuid;
 
 /// Universal Identifier (uuidv4).
 #[derive(Clone, Serialize, Deserialize)]
+#[repr(C)]
 pub struct ID<T> {
     id: Uuid,
     #[serde(skip_serializing, skip_deserializing)]

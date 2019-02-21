@@ -1,8 +1,8 @@
 [package]
 name = "psyche-host-core"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-psyche-core = { version = "0.1", path = "../psyche-core" }
+psyche-core = { version = "0.2", path = "../psyche-core" }

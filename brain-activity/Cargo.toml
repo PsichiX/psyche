@@ -1,11 +1,11 @@
 [package]
 name = "brain-activity"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 edition = "2018"
 
 [dependencies]
 piston_window = "0.89.0"
-psyche-core = { version = "0.1", path = "../psyche-core" }
-psyche-serde = { version = "0.1", path = "../psyche-serde" }
+psyche-core = { version = "0.2", path = "../psyche-core" }
+psyche-serde = { version = "0.2", path = "../psyche-serde" }
 cgmath = "0.17"
