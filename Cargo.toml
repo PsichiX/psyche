@@ -20,5 +20,5 @@ members = [
   "psyche-host-core",
 ]
 exclude = [
-  "brain-activity",
+  "demos",
 ]

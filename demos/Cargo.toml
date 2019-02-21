@@ -1,11 +1,14 @@
 [package]
-name = "brain-activity"
+name = "demos"
 version = "0.2.0"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 edition = "2018"
 
 [dependencies]
 piston_window = "0.89.0"
-psyche-core = { version = "0.2", path = "../psyche-core" }
-psyche-serde = { version = "0.2", path = "../psyche-serde" }
+psyche = { version = "0.2", path = ".." }
 cgmath = "0.17"
+
+[[bin]]
+name = "brain-activity"
+path = "src/brain-activity/main.rs"

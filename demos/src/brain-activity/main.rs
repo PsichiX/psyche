@@ -1,15 +1,14 @@
 extern crate cgmath;
 extern crate piston_window;
-extern crate psyche_core;
-extern crate psyche_serde;
+extern crate psyche;
 
 use cgmath::*;
 use piston_window::*;
-use psyche_core::brain::Brain;
-use psyche_core::brain_builder::BrainBuilder;
-use psyche_core::config::Config;
-use psyche_core::neuron::Position;
-use psyche_core::Scalar;
+use psyche::core::brain::Brain;
+use psyche::core::brain_builder::BrainBuilder;
+use psyche::core::config::Config;
+use psyche::core::neuron::Position;
+use psyche::core::Scalar;
 use std::time::Instant;
 
 fn point(point: Position, rot: &Quaternion<Scalar>) -> (Scalar, Scalar) {
@@ -44,7 +43,7 @@ fn make_brain() -> Brain {
     let mut config = Config::default();
     config.propagation_speed = 50.0;
     config.synapse_inactivity_time = 0.25;
-    config.synapse_reconnection_range = 20.0;
+    config.synapse_reconnection_range = Some(20.0);
 
     BrainBuilder::new()
         .config(config)
@@ -127,9 +126,7 @@ fn main() {
                         keyboard::Key::Return => {
                             if let ButtonState::Press = button.state {
                                 for sensor in brain.get_sensors() {
-                                    brain
-                                        .sensor_trigger_impulse(sensor, 10.0, 0.0)
-                                        .unwrap_or(());
+                                    brain.sensor_trigger_impulse(sensor, 10.0).unwrap_or(());
                                 }
                             }
                         }
@@ -150,9 +147,7 @@ fn main() {
                     if sensor_impulse_accum > trigger_sensors_delay {
                         sensor_impulse_accum = 0.0;
                         for sensor in brain.get_sensors() {
-                            brain
-                                .sensor_trigger_impulse(sensor, 10.0, 0.0)
-                                .unwrap_or(());
+                            brain.sensor_trigger_impulse(sensor, 10.0).unwrap_or(());
                         }
                     }
                 }
@@ -179,7 +174,7 @@ fn main() {
                 let transform = c.transform.trans(vx, vy).zoom(zoom);
                 for connection in &activity.connections {
                     line(
-                        [0.0, 0.0, 1.0, 0.2],
+                        [0.0, 0.0, 1.0, 0.1],
                         thickness,
                         connection_into_line(connection, &rot),
                         transform,
@@ -189,7 +184,7 @@ fn main() {
                 for impulse in &activity.impulses {
                     let (x, y) = impulse_into_point(impulse, &rot);
                     rectangle(
-                        [1.0, 1.0, 1.0, 0.5],
+                        [1.0, 1.0, 1.0, 0.25],
                         rectangle::square(x, y, thickness * 2.0),
                         transform,
                         g,
