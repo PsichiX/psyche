@@ -1,3 +1,18 @@
+[package]
+name = "psyche"
+version = "0.2.0"
+authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
+edition = "2018"
+description = "Psyche AI Toolset"
+license = "MIT"
+homepage = "https://github.com/PsichiX/psyche"
+repository = "https://github.com/PsichiX/psyche"
+documentation = "https://docs.rs/psyche"
+
+[dependencies]
+psyche-core = { version = "0.2", path = "psyche-core" }
+psyche-serde = { version = "0.2", path = "psyche-serde" }
+
 [workspace]
 members = [
   "psyche-core",
