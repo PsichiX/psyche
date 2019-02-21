@@ -12,6 +12,12 @@ pub enum Error {
     UnbindingNeuronFromItSelf(NeuronID),
     SensorDoesNotExists(SensorID),
     EffectorDoesNotExists(EffectorID),
+    BindingNeuronToSensor(NeuronID, SensorID),
+    BindingEffectorToNeuron(EffectorID, NeuronID),
+    NeuronIsAlreadyConnectedToSensor(NeuronID, SensorID),
+    NeuronIsAlreadyConnectedToEffector(NeuronID, EffectorID),
+    NeuronAlreadyHasOutgoingConnection(NeuronID),
+    NeuronAlreadyHasIncomingConnection(NeuronID),
 }
 
 impl Error {

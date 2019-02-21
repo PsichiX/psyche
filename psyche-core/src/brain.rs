@@ -231,14 +231,23 @@ impl Brain {
             .any(|s| s.source == from && s.target == to)
     }
 
-    pub fn create_sensor(&mut self, target: NeuronID) -> SensorID {
+    pub fn create_sensor(&mut self, target: NeuronID) -> Result<SensorID> {
+        if let Some(sensor) = self.sensors.iter().find(|s| s.target == target) {
+            return Err(Error::NeuronIsAlreadyConnectedToSensor(target, sensor.id));
+        }
+        if let Some(effector) = self.effectors.iter().find(|e| e.source == target) {
+            return Err(Error::NeuronIsAlreadyConnectedToEffector(
+                target,
+                effector.id,
+            ));
+        }
         let sensor = Sensor {
             id: Default::default(),
             target,
         };
         let id = sensor.id;
         self.sensors.push(sensor);
-        id
+        Ok(id)
     }
 
     pub fn kill_sensor(&mut self, id: SensorID) -> Result<()> {
@@ -266,7 +275,16 @@ impl Brain {
         }
     }
 
-    pub fn create_effector(&mut self, source: NeuronID) -> EffectorID {
+    pub fn create_effector(&mut self, source: NeuronID) -> Result<EffectorID> {
+        if let Some(sensor) = self.sensors.iter().find(|s| s.target == source) {
+            return Err(Error::NeuronIsAlreadyConnectedToSensor(source, sensor.id));
+        }
+        if let Some(effector) = self.effectors.iter().find(|e| e.source == source) {
+            return Err(Error::NeuronIsAlreadyConnectedToEffector(
+                source,
+                effector.id,
+            ));
+        }
         let effector = Effector {
             id: Default::default(),
             source,
@@ -274,7 +292,7 @@ impl Brain {
         };
         let id = effector.id;
         self.effectors.push(effector);
-        id
+        Ok(id)
     }
 
     pub fn kill_effector(&mut self, id: EffectorID) -> Result<()> {
@@ -331,6 +349,16 @@ impl Brain {
         }
         if let Some(source) = self.neuron(from) {
             if let Some(target) = self.neuron(to) {
+                if !self.config.allow_sensors_both_way_connections {
+                    if let Some(sensor) = self.sensors.iter().find(|s| s.target == to) {
+                        return Err(Error::BindingNeuronToSensor(to, sensor.id));
+                    }
+                }
+                if !self.config.allow_effectors_both_way_connections {
+                    if let Some(effector) = self.effectors.iter().find(|e| e.source == from) {
+                        return Err(Error::BindingEffectorToNeuron(effector.id, from));
+                    }
+                }
                 if self.are_neurons_connected(from, to) {
                     return Ok(false);
                 }
@@ -774,7 +802,7 @@ impl Brain {
         let effectors = self
             .effectors
             .iter()
-            .map(|s| self.neuron(s.source).unwrap().position())
+            .map(|e| self.neuron(e.source).unwrap().position())
             .collect();
         BrainActivityMap {
             connections,
@@ -822,7 +850,7 @@ impl Brain {
         let effectors = self
             .effectors
             .par_iter()
-            .map(|s| self.neuron(s.source).unwrap().position())
+            .map(|e| self.neuron(e.source).unwrap().position())
             .collect();
         BrainActivityMap {
             connections,

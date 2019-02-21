@@ -47,8 +47,8 @@ fn make_brain() -> Brain {
 
     BrainBuilder::new()
         .config(config)
-        .neurons(750)
-        .connections(750)
+        .neurons(500)
+        .connections(500)
         .min_neurogenesis_range(5.0)
         .max_neurogenesis_range(20.0)
         .radius(50.0)
@@ -72,7 +72,7 @@ fn main() {
     //     &psyche_serde::bytes::brain_to_bytes(&brain).unwrap(),
     // )
     // .unwrap_or(());
-    brain.ignite_random_synapses(brain.synapses_count());
+    // brain.ignite_random_synapses(brain.synapses_count());
 
     let vx = 300.0;
     let vy = 300.0;
@@ -153,7 +153,7 @@ fn main() {
                 }
                 let now = Instant::now();
                 brain.process_parallel(dt).unwrap_or(());
-                println!("processing: {:?}", now.elapsed());
+                // println!("processing: {:?}", now.elapsed());
             }
         }
 
@@ -168,9 +168,9 @@ fn main() {
                     y: Deg(rot_x),
                     z: Deg(0.0),
                 });
-                let now = Instant::now();
+                // let now = Instant::now();
                 let activity = brain.build_activity_map_parallel();
-                println!("building activity map: {:?}", now.elapsed());
+                // println!("building activity map: {:?}", now.elapsed());
                 let transform = c.transform.trans(vx, vy).zoom(zoom);
                 for connection in &activity.connections {
                     line(
@@ -202,7 +202,7 @@ fn main() {
                 for effector in &activity.effectors {
                     let (x, y) = point(*effector, &rot);
                     rectangle(
-                        [1.0, 0.0, 0.0, 1.0],
+                        [0.5, 0.0, 0.0, 1.0],
                         rectangle::square(x, y, thickness * 4.0),
                         transform,
                         g,

@@ -15,6 +15,7 @@ pub struct OffspringBuilder {
     new_sensors: usize,
     new_effectors: usize,
     no_loop_connections: bool,
+    max_connecting_tries: usize,
 }
 
 impl Default for OffspringBuilder {
@@ -28,6 +29,7 @@ impl Default for OffspringBuilder {
             new_sensors: 1,
             new_effectors: 1,
             no_loop_connections: true,
+            max_connecting_tries: 10,
         }
     }
 }
@@ -77,6 +79,11 @@ impl OffspringBuilder {
         self
     }
 
+    pub fn max_connecting_tries(mut self, value: usize) -> Self {
+        self.max_connecting_tries = value;
+        self
+    }
+
     pub fn build_mutated(mut self, source: &Brain) -> Brain {
         let mut brain = source.duplicate();
         let mut rng = thread_rng();
@@ -92,14 +99,28 @@ impl OffspringBuilder {
             .iter()
             .map(|id| (*id, brain.neuron(*id).unwrap().position()))
             .collect::<Vec<_>>();
-        for _ in 0..self.new_connections {
-            self.connect_neighbor_neurons(&neuron_positions, &mut brain, &mut rng);
-        }
         for _ in 0..self.new_sensors {
-            self.make_peripheral_sensor(&neuron_positions, &mut brain, &mut rng);
+            let mut tries = self.max_connecting_tries + 1;
+            while tries > 0 && !self.make_peripheral_sensor(&neuron_positions, &mut brain, &mut rng)
+            {
+                tries -= 1;
+            }
         }
         for _ in 0..self.new_effectors {
-            self.make_peripheral_effector(&neuron_positions, &mut brain, &mut rng);
+            let mut tries = self.max_connecting_tries + 1;
+            while tries > 0
+                && !self.make_peripheral_effector(&neuron_positions, &mut brain, &mut rng)
+            {
+                tries -= 1;
+            }
+        }
+        for _ in 0..self.new_connections {
+            let mut tries = self.max_connecting_tries + 1;
+            while tries > 0
+                && self.connect_neighbor_neurons(&neuron_positions, &mut brain, &mut rng)
+            {
+                tries -= 1;
+            }
         }
 
         brain
@@ -116,22 +137,36 @@ impl OffspringBuilder {
             }
         }
 
-        let diff_sensors = (source_a.get_sensors().len() + source_b.get_sensors().len()) / 2
+        self.new_sensors += (source_a.get_sensors().len() + source_b.get_sensors().len()) / 2
             - brain.get_sensors().len();
-        let diff_effectors = (source_a.get_effectors().len() + source_b.get_effectors().len()) / 2
+        self.new_effectors += (source_a.get_effectors().len() + source_b.get_effectors().len()) / 2
             - brain.get_effectors().len();
         let neuron_positions = neurons
             .iter()
             .map(|id| (*id, brain.neuron(*id).unwrap().position()))
             .collect::<Vec<_>>();
+        for _ in 0..self.new_sensors {
+            let mut tries = self.max_connecting_tries + 1;
+            while tries > 0 && !self.make_peripheral_sensor(&neuron_positions, &mut brain, &mut rng)
+            {
+                tries -= 1;
+            }
+        }
+        for _ in 0..self.new_effectors {
+            let mut tries = self.max_connecting_tries + 1;
+            while tries > 0
+                && !self.make_peripheral_effector(&neuron_positions, &mut brain, &mut rng)
+            {
+                tries -= 1;
+            }
+        }
         for _ in 0..self.new_connections {
-            self.connect_neighbor_neurons(&neuron_positions, &mut brain, &mut rng);
-        }
-        for _ in 0..(self.new_sensors + diff_sensors) {
-            self.make_peripheral_sensor(&neuron_positions, &mut brain, &mut rng);
-        }
-        for _ in 0..(self.new_effectors + diff_effectors) {
-            self.make_peripheral_effector(&neuron_positions, &mut brain, &mut rng);
+            let mut tries = self.max_connecting_tries + 1;
+            while tries > 0
+                && self.connect_neighbor_neurons(&neuron_positions, &mut brain, &mut rng)
+            {
+                tries -= 1;
+            }
         }
 
         brain
@@ -142,7 +177,8 @@ impl OffspringBuilder {
         neuron_positions: &[(NeuronID, Position)],
         brain: &mut Brain,
         rng: &mut R,
-    ) where
+    ) -> bool
+    where
         R: Rng,
     {
         let pos = self.make_new_peripheral_position(rng);
@@ -153,7 +189,7 @@ impl OffspringBuilder {
             .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
             .unwrap()
             .0;
-        brain.create_sensor(neuron_positions[index].0);
+        brain.create_sensor(neuron_positions[index].0).is_ok()
     }
 
     fn make_peripheral_effector<R>(
@@ -161,7 +197,8 @@ impl OffspringBuilder {
         neuron_positions: &[(NeuronID, Position)],
         brain: &mut Brain,
         rng: &mut R,
-    ) where
+    ) -> bool
+    where
         R: Rng,
     {
         let pos = self.make_new_peripheral_position(rng);
@@ -172,7 +209,7 @@ impl OffspringBuilder {
             .min_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
             .unwrap()
             .0;
-        brain.create_effector(neuron_positions[index].0);
+        brain.create_effector(neuron_positions[index].0).is_ok()
     }
 
     fn make_neighbor_neuron<R>(
@@ -200,7 +237,8 @@ impl OffspringBuilder {
         neuron_positions: &[(NeuronID, Position)],
         brain: &mut Brain,
         rng: &mut R,
-    ) where
+    ) -> bool
+    where
         R: Rng,
     {
         let origin =
@@ -216,13 +254,11 @@ impl OffspringBuilder {
             })
             .collect::<Vec<_>>();
         let target = *filtered[rng.gen_range(0, filtered.len()) % filtered.len()];
-        if origin.0 != target
+        origin.0 != target
             && (!self.no_loop_connections
                 || (!brain.are_neurons_connected(origin.0, target)
                     && !brain.are_neurons_connected(target, origin.0)))
-        {
-            drop(brain.bind_neurons(origin.0, target));
-        }
+            && brain.bind_neurons(origin.0, target).is_ok()
     }
 
     fn make_new_position<R>(&self, pos: Position, scale: Scalar, rng: &mut R) -> Position

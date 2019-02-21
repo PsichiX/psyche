@@ -14,6 +14,8 @@ pub struct Config {
     pub synapse_inactivity_time: Scalar,
     pub synapse_reconnection_range: Option<Scalar>,
     pub synapse_reconnection_no_loop: bool,
+    pub allow_sensors_both_way_connections: bool,
+    pub allow_effectors_both_way_connections: bool,
 }
 
 impl Default for Config {
@@ -29,6 +31,8 @@ impl Default for Config {
             synapse_inactivity_time: 0.1,
             synapse_reconnection_range: None,
             synapse_reconnection_no_loop: true,
+            allow_sensors_both_way_connections: false,
+            allow_effectors_both_way_connections: false,
         }
     }
 }
@@ -76,6 +80,10 @@ impl Config {
             },
             synapse_reconnection_no_loop: self.synapse_reconnection_no_loop
                 || other.synapse_reconnection_no_loop,
+            allow_sensors_both_way_connections: self.allow_sensors_both_way_connections
+                || other.allow_sensors_both_way_connections,
+            allow_effectors_both_way_connections: self.allow_effectors_both_way_connections
+                || other.allow_effectors_both_way_connections,
         }
     }
 }

@@ -23,10 +23,11 @@ fn test_brain() {
         y: 0.0,
         z: 0.0,
     });
-    let s1 = brain.create_sensor(n1);
+    let s1 = brain.create_sensor(n1).unwrap();
+    let e1 = brain.create_effector(n3).unwrap();
     brain.bind_neurons(n1, n2).unwrap();
     brain.bind_neurons(n2, n3).unwrap();
-    let e1 = brain.create_effector(n3);
+    assert!(brain.bind_neurons(n3, n1).is_err());
     brain.sensor_trigger_impulse(s1, 10.0).unwrap();
 
     for _ in 0..10 {
