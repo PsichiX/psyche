@@ -27,7 +27,7 @@ fn test_brain() {
     brain.bind_neurons(n1, n2).unwrap();
     brain.bind_neurons(n2, n3).unwrap();
     let e1 = brain.create_effector(n3);
-    brain.sensor_trigger_impulse(s1, 10.0, 2.0).unwrap();
+    brain.sensor_trigger_impulse(s1, 10.0).unwrap();
 
     for _ in 0..10 {
         brain.process(1.0).unwrap();

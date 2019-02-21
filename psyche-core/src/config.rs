@@ -1,4 +1,4 @@
-use crate::{Scalar, INFINITY};
+use crate::Scalar;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -12,7 +12,7 @@ pub struct Config {
     pub receptors_inhibition: Scalar,
     pub default_receptors: (Scalar, Scalar),
     pub synapse_inactivity_time: Scalar,
-    pub synapse_reconnection_range: Scalar,
+    pub synapse_reconnection_range: Option<Scalar>,
     pub synapse_reconnection_no_loop: bool,
 }
 
@@ -27,7 +27,7 @@ impl Default for Config {
             receptors_inhibition: 0.1,
             default_receptors: (0.5, 1.5),
             synapse_inactivity_time: 0.1,
-            synapse_reconnection_range: INFINITY,
+            synapse_reconnection_range: None,
             synapse_reconnection_no_loop: true,
         }
     }
@@ -65,10 +65,15 @@ impl Config {
                 self.synapse_inactivity_time,
                 other.synapse_inactivity_time,
             ),
-            synapse_reconnection_range: merge_scalar(
+            synapse_reconnection_range: match (
                 self.synapse_reconnection_range,
                 other.synapse_reconnection_range,
-            ),
+            ) {
+                (None, None) => None,
+                (Some(a), None) => Some(a),
+                (None, Some(b)) => Some(b),
+                (Some(a), Some(b)) => Some(merge_scalar(a, b)),
+            },
             synapse_reconnection_no_loop: self.synapse_reconnection_no_loop
                 || other.synapse_reconnection_no_loop,
         }

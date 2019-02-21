@@ -250,17 +250,12 @@ impl Brain {
         }
     }
 
-    pub fn sensor_trigger_impulse(
-        &mut self,
-        id: SensorID,
-        potential: Scalar,
-        decay: Scalar,
-    ) -> Result<()> {
+    pub fn sensor_trigger_impulse(&mut self, id: SensorID, potential: Scalar) -> Result<()> {
         if let Some(sensor) = self.sensors.iter().find(|s| s.id == id) {
             if let Some(neuron) = self.neurons.iter_mut().find(|n| n.id() == sensor.target) {
                 neuron.push_impulse(Impulse {
                     value: potential,
-                    timeout: decay,
+                    timeout: self.config.neuron_impulse_decay,
                 });
                 Ok(())
             } else {
@@ -720,12 +715,13 @@ impl Brain {
     where
         R: Rng,
     {
+        let srr = self.config.synapse_reconnection_range;
         let filtered = self
             .neurons
             .iter()
             .filter_map(|neuron| {
                 if neuron.is_active()
-                    && neuron.position().distance(position) < self.config.synapse_reconnection_range
+                    && (srr.is_none() || neuron.position().distance(position) < srr.unwrap())
                 {
                     Some(neuron.id())
                 } else {

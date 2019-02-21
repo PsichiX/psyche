@@ -24,11 +24,10 @@ fn test_brain() {
         y: 0.0,
         z: 0.0,
     });
-    let s1 = brain.create_sensor(n1);
+    brain.create_sensor(n1);
     brain.bind_neurons(n1, n2).unwrap();
     brain.bind_neurons(n2, n3).unwrap();
     brain.create_effector(n3);
-    brain.sensor_trigger_impulse(s1, 10.0, 2.0).unwrap();
 
     let json = brain_to_json(&brain, true).unwrap();
     let brain_json = brain_from_json(&json).unwrap();
@@ -61,11 +60,12 @@ fn test_brain_activity_map() {
         y: 0.0,
         z: 0.0,
     });
-    brain.create_sensor(n1);
+    let s1 = brain.create_sensor(n1);
     brain.bind_neurons(n1, n2).unwrap();
     brain.bind_neurons(n2, n3).unwrap();
     brain.create_effector(n3);
-    brain.ignite_random_synapses(brain.synapses_count());
+    brain.sensor_trigger_impulse(s1, 10.0).unwrap();
+    brain.process(2.0).unwrap();
     let bam = brain.build_activity_map();
 
     let json = brain_activity_map_to_json(&bam, true).unwrap();
