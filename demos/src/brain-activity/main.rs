@@ -22,7 +22,7 @@ fn make_brain() -> Brain {
 
     BrainBuilder::new()
         .config(config)
-        .neurons(2000)
+        .neurons(1500)
         .connections(10000)
         .min_neurogenesis_range(5.0)
         .max_neurogenesis_range(20.0)
@@ -98,8 +98,11 @@ fn main() {
     let mut rot_y = 0.0;
     let rot_speed = 30.0;
     let mut rot = Quaternion::zero();
-    let trigger_sensors = true;
+    let mut trigger_sensors = true;
     let trigger_sensors_delay = 0.1;
+    let activity_flags = activity::CONNECTIONS | activity::IMPULSES;
+    let mut activity_map = Default::default();
+    let mut activity_dirty = true;
 
     window.set_max_fps(30);
     window.set_ups(20);
@@ -116,6 +119,11 @@ fn main() {
                         keyboard::Key::R => {
                             if let ButtonState::Press = button.state {
                                 rendering = !rendering;
+                            }
+                        }
+                        keyboard::Key::T => {
+                            if let ButtonState::Press = button.state {
+                                trigger_sensors = !trigger_sensors;
                             }
                         }
                         keyboard::Key::W => match button.state {
@@ -153,6 +161,7 @@ fn main() {
             rot_y += dt * hold_rot_y * rot_speed;
             rot_y = rot_y.max(-90.0).min(90.0);
             if processing {
+                let now = Instant::now();
                 if trigger_sensors {
                     sensor_impulse_accum += dt;
                     if sensor_impulse_accum > trigger_sensors_delay {
@@ -165,31 +174,33 @@ fn main() {
                         }
                     }
                 }
-                let now = Instant::now();
                 brain.process_parallel(dt).unwrap_or(());
+                activity_dirty = true;
                 println!("processing: {:?}", now.elapsed());
                 println!("- neurons: {:?}", brain.neurons().len());
                 println!("- synapses: {:?}", brain.synapses_count());
+            }
+            if activity_dirty {
+                activity_map = brain.build_activity_map_parallel(activity_flags);
+                activity_dirty = false;
             }
         }
 
         if e.render_args().is_some() {
             window.draw_2d(&e, |c, g| {
-                clear([0.0, 0.0, 0.0, 1.0], g);
                 if !rendering {
                     return;
                 }
+                clear([0.0, 0.0, 0.0, 1.0], g);
+                let now = Instant::now();
                 rot = Quaternion::from(Euler {
                     x: Deg(rot_y),
                     y: Deg(rot_x),
                     z: Deg(0.0),
                 });
-                // let now = Instant::now();
-                let activity = brain.build_activity_map_parallel(activity::ALL);
-                // println!("building activity map: {:?}", now.elapsed());
                 let transform = c.transform.trans(vx, vy).zoom(zoom);
                 let f = brain.config().default_receptors.1;
-                for connection in &activity.connections {
+                for connection in &activity_map.connections {
                     line(
                         [0.0, 0.0, 1.0, (connection.2 / f) as f32 * 0.1],
                         thickness,
@@ -198,14 +209,7 @@ fn main() {
                         g,
                     );
                 }
-                for impulse in &activity.impulses {
-                    // let (x, y) = impulse_into_point(impulse, &rot);
-                    // rectangle(
-                    //     [1.0, 1.0, 1.0, 0.25],
-                    //     rectangle::square(x, y, thickness * 2.0),
-                    //     transform,
-                    //     g,
-                    // );
+                for impulse in &activity_map.impulses {
                     line(
                         [0.75, 0.75, 1.0, impulse.2 as f32 * 0.1],
                         thickness,
@@ -214,7 +218,16 @@ fn main() {
                         g,
                     );
                 }
-                for sensor in &activity.sensors {
+                for neuron in &activity_map.neurons {
+                    let (x, y) = point(*neuron, &rot);
+                    rectangle(
+                        [1.0, 0.0, 1.0, 0.5],
+                        rectangle::square(x, y, thickness * 2.0),
+                        transform,
+                        g,
+                    );
+                }
+                for sensor in &activity_map.sensors {
                     let (x, y) = point(*sensor, &rot);
                     rectangle(
                         [1.0, 1.0, 0.0, 1.0],
@@ -223,7 +236,7 @@ fn main() {
                         g,
                     );
                 }
-                for effector in &activity.effectors {
+                for effector in &activity_map.effectors {
                     let (x, y) = point(*effector, &rot);
                     rectangle(
                         [0.5, 0.0, 0.0, 1.0],
@@ -232,6 +245,7 @@ fn main() {
                         g,
                     );
                 }
+                println!("rendering: {:?}", now.elapsed());
             });
         }
     }

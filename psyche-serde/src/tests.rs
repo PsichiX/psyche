@@ -2,8 +2,8 @@
 use crate::bytes::*;
 use crate::json::*;
 use crate::yaml::*;
-use psyche_core::brain::*;
 use psyche_core::brain::activity;
+use psyche_core::brain::*;
 use psyche_core::config::*;
 use psyche_core::neuron::*;
 

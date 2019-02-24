@@ -11,6 +11,7 @@ pub struct Config {
     pub receptors_excitation: Scalar,
     pub receptors_inhibition: Scalar,
     pub default_receptors: (Scalar, Scalar),
+    pub new_connections_delay: Scalar,
     pub synapse_inactivity_time: Scalar,
     pub synapse_reconnection_range: Option<Scalar>,
     pub synapse_overdose_receptors: Option<Scalar>,
@@ -19,18 +20,21 @@ pub struct Config {
     pub allow_effectors_both_way_connections: bool,
     pub only_one_outgoing_neuron_connection: bool,
     pub only_one_incoming_neuron_connection: bool,
+    pub do_not_kill_neurons: bool,
+    pub reconnect_only_with_active_neurons: bool,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
             propagation_speed: 1.0,
-            neuron_impulse_decay: 1.0,
+            neuron_impulse_decay: 0.1,
             default_action_potential: 1.0,
             action_potential_treshold: 1.0,
             receptors_excitation: 1.0,
             receptors_inhibition: 0.1,
             default_receptors: (0.5, 1.5),
+            new_connections_delay: 0.0,
             synapse_inactivity_time: 0.1,
             synapse_reconnection_range: None,
             synapse_overdose_receptors: Some(10.0),
@@ -39,6 +43,8 @@ impl Default for Config {
             allow_effectors_both_way_connections: false,
             only_one_outgoing_neuron_connection: true,
             only_one_incoming_neuron_connection: false,
+            do_not_kill_neurons: false,
+            reconnect_only_with_active_neurons: false,
         }
     }
 }
@@ -70,6 +76,10 @@ impl Config {
             default_receptors: (
                 merge_scalar(self.default_receptors.0, other.default_receptors.0),
                 merge_scalar(self.default_receptors.1, other.default_receptors.1),
+            ),
+            new_connections_delay: merge_scalar(
+                self.new_connections_delay,
+                other.new_connections_delay,
             ),
             synapse_inactivity_time: merge_scalar(
                 self.synapse_inactivity_time,
@@ -103,6 +113,9 @@ impl Config {
                 || other.only_one_outgoing_neuron_connection,
             only_one_incoming_neuron_connection: self.only_one_incoming_neuron_connection
                 || other.only_one_incoming_neuron_connection,
+            do_not_kill_neurons: self.do_not_kill_neurons || other.do_not_kill_neurons,
+            reconnect_only_with_active_neurons: self.reconnect_only_with_active_neurons
+                || other.reconnect_only_with_active_neurons,
         }
     }
 }
