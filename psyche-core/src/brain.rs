@@ -1,5 +1,3 @@
-// TODO: add disabling synapse from propagation when receptors meet upper treshold (overdose effect).
-
 use crate::config::Config;
 use crate::effector::{Effector, EffectorID};
 use crate::error::*;
@@ -10,19 +8,30 @@ use crate::Scalar;
 use rand::{thread_rng, Rng};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
-use std::slice::Iter;
+
+pub mod activity {
+    pub const NONE: usize = 0;
+    pub const CONNECTIONS: usize = 1 << 0;
+    pub const IMPULSES: usize = 1 << 1;
+    pub const SENSORS: usize = 1 << 2;
+    pub const EFFECTORS: usize = 1 << 3;
+    pub const ALL: usize = 0xF;
+}
 
 pub type BrainID = ID<Brain>;
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[repr(C)]
 pub struct BrainActivityMap {
-    pub connections: Vec<(Position, Position)>,
+    // (point from, point to, receptors)
+    pub connections: Vec<(Position, Position, Scalar)>,
+    // (point from, point to, factor)
     pub impulses: Vec<(Position, Position, Scalar)>,
+    // point
     pub sensors: Vec<Position>,
+    // point
     pub effectors: Vec<Position>,
 }
-
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Brain {
     id: BrainID,
@@ -220,8 +229,8 @@ impl Brain {
     }
 
     #[inline]
-    pub fn neurons(&self) -> Iter<Neuron> {
-        self.neurons.iter()
+    pub fn neurons(&self) -> &[Neuron] {
+        &self.neurons
     }
 
     #[inline]
@@ -229,6 +238,13 @@ impl Brain {
         self.synapses
             .iter()
             .any(|s| s.source == from && s.target == to)
+    }
+
+    #[inline]
+    pub fn does_neuron_has_connections(&self, id: NeuronID) -> bool {
+        self.synapses
+            .iter()
+            .any(|s| s.source == id || s.target == id)
     }
 
     pub fn create_sensor(&mut self, target: NeuronID) -> Result<SensorID> {
@@ -349,6 +365,9 @@ impl Brain {
         }
         if let Some(source) = self.neuron(from) {
             if let Some(target) = self.neuron(to) {
+                if self.are_neurons_connected(from, to) {
+                    return Ok(false);
+                }
                 if !self.config.allow_sensors_both_way_connections {
                     if let Some(sensor) = self.sensors.iter().find(|s| s.target == to) {
                         return Err(Error::BindingNeuronToSensor(to, sensor.id));
@@ -359,8 +378,15 @@ impl Brain {
                         return Err(Error::BindingEffectorToNeuron(effector.id, from));
                     }
                 }
-                if self.are_neurons_connected(from, to) {
-                    return Ok(false);
+                if self.config.only_one_outgoing_neuron_connection
+                    && self.synapses.iter().any(|s| s.source == from)
+                {
+                    return Err(Error::NeuronAlreadyHasOutgoingConnection(from));
+                }
+                if self.config.only_one_incoming_neuron_connection
+                    && self.synapses.iter().any(|s| s.target == to)
+                {
+                    return Err(Error::NeuronAlreadyHasIncomingConnection(to));
                 }
                 let distance = source.position().distance(target.position());
                 self.synapses.push(Synapse {
@@ -417,10 +443,17 @@ impl Brain {
                 if impulse_sum >= self.config.action_potential_treshold {
                     for s in self.synapses.iter_mut().filter(|s| s.source == neuron.id()) {
                         if s.inactivity <= 0.0 {
-                            s.impulses.push(Impulse {
-                                value: self.config.default_action_potential,
-                                timeout: s.distance,
-                            });
+                            let under = if let Some(o) = self.config.synapse_overdose_receptors {
+                                s.receptors < o
+                            } else {
+                                true
+                            };
+                            if under {
+                                s.impulses.push(Impulse {
+                                    value: self.config.default_action_potential,
+                                    timeout: s.distance,
+                                });
+                            }
                             s.inactivity = self.config.synapse_inactivity_time;
                         }
                     }
@@ -560,6 +593,7 @@ impl Brain {
         let synapse_inactivity_time = self.config.synapse_inactivity_time;
         let default_action_potential = self.config.default_action_potential;
         let neuron_impulse_decay = self.config.neuron_impulse_decay;
+        let synapse_overdose_receptors = self.config.synapse_overdose_receptors;
 
         // neuron input processing phase.
         {
@@ -587,10 +621,17 @@ impl Brain {
                 if s.inactivity <= 0.0 {
                     let sid = s.source;
                     if neurons_triggering.iter().any(|id| sid == *id) {
-                        s.impulses.push(Impulse {
-                            value: default_action_potential,
-                            timeout: s.distance,
-                        });
+                        let under = if let Some(o) = synapse_overdose_receptors {
+                            s.receptors < o
+                        } else {
+                            true
+                        };
+                        if under {
+                            s.impulses.push(Impulse {
+                                value: default_action_potential,
+                                timeout: s.distance,
+                            });
+                        }
                         s.inactivity = synapse_inactivity_time;
                     }
                 }
@@ -764,46 +805,59 @@ impl Brain {
         }
     }
 
-    pub fn build_activity_map(&self) -> BrainActivityMap {
-        let connections = self
-            .synapses
-            .iter()
-            .map(|s| {
-                let from = self.neuron(s.source).unwrap().position();
-                let to = self.neuron(s.target).unwrap().position();
-                (from, to)
-            })
-            .collect();
-        let impulses = self
-            .synapses
-            .iter()
-            .map(|s| {
-                let from = self.neuron(s.source).unwrap().position();
-                let to = self.neuron(s.target).unwrap().position();
-                let distance = from.distance(to);
-                s.impulses
-                    .iter()
-                    .map(|i| {
-                        if distance > 0.0 {
-                            (from, to, 1.0 - i.timeout.max(0.0).min(distance) / distance)
-                        } else {
-                            (from, to, 0.0)
-                        }
-                    })
-                    .collect::<Vec<_>>()
-            })
-            .flatten()
-            .collect();
-        let sensors = self
-            .sensors
-            .iter()
-            .map(|s| self.neuron(s.target).unwrap().position())
-            .collect();
-        let effectors = self
-            .effectors
-            .iter()
-            .map(|e| self.neuron(e.source).unwrap().position())
-            .collect();
+    pub fn build_activity_map(&self, flags: usize) -> BrainActivityMap {
+        let connections = if flags & activity::CONNECTIONS != 0 {
+            self.synapses
+                .iter()
+                .map(|s| {
+                    let from = self.neuron(s.source).unwrap().position();
+                    let to = self.neuron(s.target).unwrap().position();
+                    (from, to, s.receptors)
+                })
+                .collect()
+        } else {
+            vec![]
+        };
+        let impulses = if flags & activity::IMPULSES != 0 {
+            self.synapses
+                .iter()
+                .map(|s| {
+                    let from = self.neuron(s.source).unwrap().position();
+                    let to = self.neuron(s.target).unwrap().position();
+                    let distance = from.distance(to);
+                    s.impulses
+                        .iter()
+                        .map(|i| {
+                            let factor = if distance > 0.0 {
+                                1.0 - i.timeout.max(0.0).min(distance) / distance
+                            } else {
+                                0.0
+                            };
+                            (from, to, factor)
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .flatten()
+                .collect()
+        } else {
+            vec![]
+        };
+        let sensors = if flags & activity::SENSORS != 0 {
+            self.sensors
+                .iter()
+                .map(|s| self.neuron(s.target).unwrap().position())
+                .collect()
+        } else {
+            vec![]
+        };
+        let effectors = if flags & activity::EFFECTORS != 0 {
+            self.effectors
+                .iter()
+                .map(|e| self.neuron(e.source).unwrap().position())
+                .collect()
+        } else {
+            vec![]
+        };
         BrainActivityMap {
             connections,
             impulses,
@@ -812,46 +866,59 @@ impl Brain {
         }
     }
 
-    pub fn build_activity_map_parallel(&self) -> BrainActivityMap {
-        let connections = self
-            .synapses
-            .par_iter()
-            .map(|s| {
-                let from = self.neuron(s.source).unwrap().position();
-                let to = self.neuron(s.target).unwrap().position();
-                (from, to)
-            })
-            .collect();
-        let impulses = self
-            .synapses
-            .par_iter()
-            .map(|s| {
-                let from = self.neuron(s.source).unwrap().position();
-                let to = self.neuron(s.target).unwrap().position();
-                let distance = from.distance(to);
-                s.impulses
-                    .iter()
-                    .map(|i| {
-                        if distance > 0.0 {
-                            (from, to, 1.0 - i.timeout.max(0.0).min(distance) / distance)
-                        } else {
-                            (from, to, 0.0)
-                        }
-                    })
-                    .collect::<Vec<_>>()
-            })
-            .flatten()
-            .collect();
-        let sensors = self
-            .sensors
-            .par_iter()
-            .map(|s| self.neuron(s.target).unwrap().position())
-            .collect();
-        let effectors = self
-            .effectors
-            .par_iter()
-            .map(|e| self.neuron(e.source).unwrap().position())
-            .collect();
+    pub fn build_activity_map_parallel(&self, flags: usize) -> BrainActivityMap {
+        let connections = if flags & activity::CONNECTIONS != 0 {
+            self.synapses
+                .par_iter()
+                .map(|s| {
+                    let from = self.neuron(s.source).unwrap().position();
+                    let to = self.neuron(s.target).unwrap().position();
+                    (from, to, s.receptors)
+                })
+                .collect()
+        } else {
+            vec![]
+        };
+        let impulses = if flags & activity::IMPULSES != 0 {
+            self.synapses
+                .par_iter()
+                .map(|s| {
+                    let from = self.neuron(s.source).unwrap().position();
+                    let to = self.neuron(s.target).unwrap().position();
+                    let distance = from.distance(to);
+                    s.impulses
+                        .iter()
+                        .map(|i| {
+                            let factor = if distance > 0.0 {
+                                1.0 - i.timeout.max(0.0).min(distance) / distance
+                            } else {
+                                0.0
+                            };
+                            (from, to, factor)
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .flatten()
+                .collect()
+        } else {
+            vec![]
+        };
+        let sensors = if flags & activity::SENSORS != 0 {
+            self.sensors
+                .par_iter()
+                .map(|s| self.neuron(s.target).unwrap().position())
+                .collect()
+        } else {
+            vec![]
+        };
+        let effectors = if flags & activity::EFFECTORS != 0 {
+            self.effectors
+                .par_iter()
+                .map(|e| self.neuron(e.source).unwrap().position())
+                .collect()
+        } else {
+            vec![]
+        };
         BrainActivityMap {
             connections,
             impulses,

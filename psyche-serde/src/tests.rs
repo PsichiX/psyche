@@ -3,6 +3,7 @@ use crate::bytes::*;
 use crate::json::*;
 use crate::yaml::*;
 use psyche_core::brain::*;
+use psyche_core::brain::activity;
 use psyche_core::config::*;
 use psyche_core::neuron::*;
 
@@ -66,7 +67,7 @@ fn test_brain_activity_map() {
     brain.create_effector(n3).unwrap();
     brain.sensor_trigger_impulse(s1, 10.0).unwrap();
     brain.process(2.0).unwrap();
-    let bam = brain.build_activity_map();
+    let bam = brain.build_activity_map(activity::ALL);
 
     let json = brain_activity_map_to_json(&bam, true).unwrap();
     let bam_json = brain_activity_map_from_json(&json).unwrap();

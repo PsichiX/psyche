@@ -1,14 +1,15 @@
 [package]
 name = "demos"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 edition = "2018"
+
+[[bin]]
+name = "brain-activity"
+path = "src/brain-activity/main.rs"
 
 [dependencies]
 piston_window = "0.89.0"
 psyche = { version = "0.2", path = ".." }
 cgmath = "0.17"
-
-[[bin]]
-name = "brain-activity"
-path = "src/brain-activity/main.rs"
+rand = "0.5"

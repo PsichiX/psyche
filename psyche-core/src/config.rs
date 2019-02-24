@@ -13,9 +13,12 @@ pub struct Config {
     pub default_receptors: (Scalar, Scalar),
     pub synapse_inactivity_time: Scalar,
     pub synapse_reconnection_range: Option<Scalar>,
+    pub synapse_overdose_receptors: Option<Scalar>,
     pub synapse_reconnection_no_loop: bool,
     pub allow_sensors_both_way_connections: bool,
     pub allow_effectors_both_way_connections: bool,
+    pub only_one_outgoing_neuron_connection: bool,
+    pub only_one_incoming_neuron_connection: bool,
 }
 
 impl Default for Config {
@@ -30,9 +33,12 @@ impl Default for Config {
             default_receptors: (0.5, 1.5),
             synapse_inactivity_time: 0.1,
             synapse_reconnection_range: None,
+            synapse_overdose_receptors: Some(10.0),
             synapse_reconnection_no_loop: true,
             allow_sensors_both_way_connections: false,
             allow_effectors_both_way_connections: false,
+            only_one_outgoing_neuron_connection: true,
+            only_one_incoming_neuron_connection: false,
         }
     }
 }
@@ -78,12 +84,25 @@ impl Config {
                 (None, Some(b)) => Some(b),
                 (Some(a), Some(b)) => Some(merge_scalar(a, b)),
             },
+            synapse_overdose_receptors: match (
+                self.synapse_overdose_receptors,
+                other.synapse_overdose_receptors,
+            ) {
+                (None, None) => None,
+                (Some(a), None) => Some(a),
+                (None, Some(b)) => Some(b),
+                (Some(a), Some(b)) => Some(merge_scalar(a, b)),
+            },
             synapse_reconnection_no_loop: self.synapse_reconnection_no_loop
                 || other.synapse_reconnection_no_loop,
             allow_sensors_both_way_connections: self.allow_sensors_both_way_connections
                 || other.allow_sensors_both_way_connections,
             allow_effectors_both_way_connections: self.allow_effectors_both_way_connections
                 || other.allow_effectors_both_way_connections,
+            only_one_outgoing_neuron_connection: self.only_one_outgoing_neuron_connection
+                || other.only_one_outgoing_neuron_connection,
+            only_one_incoming_neuron_connection: self.only_one_incoming_neuron_connection
+                || other.only_one_incoming_neuron_connection,
         }
     }
 }

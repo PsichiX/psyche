@@ -1,54 +1,29 @@
 extern crate cgmath;
 extern crate piston_window;
 extern crate psyche;
+extern crate rand;
 
 use cgmath::*;
 use piston_window::*;
+use psyche::core::brain::activity;
 use psyche::core::brain::Brain;
 use psyche::core::brain_builder::BrainBuilder;
 use psyche::core::config::Config;
 use psyche::core::neuron::Position;
 use psyche::core::Scalar;
+use rand::{thread_rng, Rng};
 use std::time::Instant;
-
-fn point(point: Position, rot: &Quaternion<Scalar>) -> (Scalar, Scalar) {
-    let p = Point3::new(point.x, point.y, point.z);
-    let p = rot.rotate_point(p);
-    (p.x, p.y)
-}
-
-fn connection_into_line(pair: &(Position, Position), rot: &Quaternion<Scalar>) -> [f64; 4] {
-    let p0 = Point3::new(pair.0.x, pair.0.y, pair.0.z);
-    let p1 = Point3::new(pair.1.x, pair.1.y, pair.1.z);
-    let p0 = rot.rotate_point(p0);
-    let p1 = rot.rotate_point(p1);
-    [p0.x, p0.y, p1.x, p1.y]
-}
-
-fn impulse_into_point(
-    impulse: &(Position, Position, Scalar),
-    rot: &Quaternion<Scalar>,
-) -> (Scalar, Scalar) {
-    point(
-        Position {
-            x: (impulse.1.x - impulse.0.x) * impulse.2 + impulse.0.x,
-            y: (impulse.1.y - impulse.0.y) * impulse.2 + impulse.0.y,
-            z: (impulse.1.z - impulse.0.z) * impulse.2 + impulse.0.z,
-        },
-        rot,
-    )
-}
 
 fn make_brain() -> Brain {
     let mut config = Config::default();
     config.propagation_speed = 50.0;
-    config.synapse_inactivity_time = 0.25;
-    config.synapse_reconnection_range = Some(20.0);
+    config.synapse_inactivity_time = 0.15;
+    config.synapse_reconnection_range = Some(25.0);
 
     BrainBuilder::new()
         .config(config)
-        .neurons(500)
-        .connections(500)
+        .neurons(2000)
+        .connections(10000)
         .min_neurogenesis_range(5.0)
         .max_neurogenesis_range(20.0)
         .radius(50.0)
@@ -56,6 +31,42 @@ fn make_brain() -> Brain {
         .effectors(25)
         .build()
 }
+
+fn point(point: Position, rot: &Quaternion<Scalar>) -> (Scalar, Scalar) {
+    let p = Point3::new(point.x, point.y, point.z);
+    let p = rot.rotate_point(p);
+    (p.x, p.y)
+}
+
+fn connection_into_line(pair: &(Position, Position, Scalar), rot: &Quaternion<Scalar>) -> [f64; 4] {
+    let p0 = Point3::new(pair.0.x, pair.0.y, pair.0.z);
+    let p1 = Point3::new(pair.1.x, pair.1.y, pair.1.z);
+    let p0 = rot.rotate_point(p0);
+    let p1 = rot.rotate_point(p1);
+    [p0.x, p0.y, p1.x, p1.y]
+}
+
+fn impulse_into_line(pair: &(Position, Position, Scalar), rot: &Quaternion<Scalar>) -> [f64; 4] {
+    let p0 = Point3::new(pair.0.x, pair.0.y, pair.0.z);
+    let p1 = Point3::new(pair.1.x, pair.1.y, pair.1.z);
+    let p0 = rot.rotate_point(p0);
+    let p1 = rot.rotate_point(p1);
+    [p0.x, p0.y, p1.x, p1.y]
+}
+
+// fn impulse_into_point(
+//     impulse: &(Position, Position, Scalar),
+//     rot: &Quaternion<Scalar>,
+// ) -> (Scalar, Scalar) {
+//     point(
+//         Position {
+//             x: (impulse.1.x - impulse.0.x) * impulse.2 + impulse.0.x,
+//             y: (impulse.1.y - impulse.0.y) * impulse.2 + impulse.0.y,
+//             z: (impulse.1.z - impulse.0.z) * impulse.2 + impulse.0.z,
+//         },
+//         rot,
+//     )
+// }
 
 fn main() {
     let mut window: PistonWindow =
@@ -87,8 +98,8 @@ fn main() {
     let mut rot_y = 0.0;
     let rot_speed = 30.0;
     let mut rot = Quaternion::zero();
-    let trigger_sensors = false;
-    let trigger_sensors_delay = 0.25;
+    let trigger_sensors = true;
+    let trigger_sensors_delay = 0.1;
 
     window.set_max_fps(30);
     window.set_ups(20);
@@ -108,11 +119,11 @@ fn main() {
                             }
                         }
                         keyboard::Key::W => match button.state {
-                            ButtonState::Press => hold_rot_y = -1.0,
+                            ButtonState::Press => hold_rot_y = 1.0,
                             ButtonState::Release => hold_rot_y = 0.0,
                         },
                         keyboard::Key::S => match button.state {
-                            ButtonState::Press => hold_rot_y = 1.0,
+                            ButtonState::Press => hold_rot_y = -1.0,
                             ButtonState::Release => hold_rot_y = 0.0,
                         },
                         keyboard::Key::A => match button.state {
@@ -146,14 +157,19 @@ fn main() {
                     sensor_impulse_accum += dt;
                     if sensor_impulse_accum > trigger_sensors_delay {
                         sensor_impulse_accum = 0.0;
+                        let mut rng = thread_rng();
                         for sensor in brain.get_sensors() {
-                            brain.sensor_trigger_impulse(sensor, 10.0).unwrap_or(());
+                            if rng.gen() {
+                                brain.sensor_trigger_impulse(sensor, 10.0).unwrap_or(());
+                            }
                         }
                     }
                 }
                 let now = Instant::now();
                 brain.process_parallel(dt).unwrap_or(());
-                // println!("processing: {:?}", now.elapsed());
+                println!("processing: {:?}", now.elapsed());
+                println!("- neurons: {:?}", brain.neurons().len());
+                println!("- synapses: {:?}", brain.synapses_count());
             }
         }
 
@@ -169,12 +185,13 @@ fn main() {
                     z: Deg(0.0),
                 });
                 // let now = Instant::now();
-                let activity = brain.build_activity_map_parallel();
+                let activity = brain.build_activity_map_parallel(activity::ALL);
                 // println!("building activity map: {:?}", now.elapsed());
                 let transform = c.transform.trans(vx, vy).zoom(zoom);
+                let f = brain.config().default_receptors.1;
                 for connection in &activity.connections {
                     line(
-                        [0.0, 0.0, 1.0, 0.1],
+                        [0.0, 0.0, 1.0, (connection.2 / f) as f32 * 0.1],
                         thickness,
                         connection_into_line(connection, &rot),
                         transform,
@@ -182,10 +199,17 @@ fn main() {
                     );
                 }
                 for impulse in &activity.impulses {
-                    let (x, y) = impulse_into_point(impulse, &rot);
-                    rectangle(
-                        [1.0, 1.0, 1.0, 0.25],
-                        rectangle::square(x, y, thickness * 2.0),
+                    // let (x, y) = impulse_into_point(impulse, &rot);
+                    // rectangle(
+                    //     [1.0, 1.0, 1.0, 0.25],
+                    //     rectangle::square(x, y, thickness * 2.0),
+                    //     transform,
+                    //     g,
+                    // );
+                    line(
+                        [0.75, 0.75, 1.0, impulse.2 as f32 * 0.1],
+                        thickness,
+                        impulse_into_line(impulse, &rot),
                         transform,
                         g,
                     );

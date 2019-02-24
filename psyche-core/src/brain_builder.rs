@@ -104,9 +104,7 @@ impl BrainBuilder {
             z: 0.0,
         }));
         for _ in 0..self.neurons {
-            if let Some(neuron) = self.make_neighbor_neuron(&neurons, &mut brain, &mut rng) {
-                neurons.push(neuron);
-            }
+            neurons.push(self.make_neighbor_neuron(&neurons, &mut brain, &mut rng));
         }
 
         let neuron_positions = neurons
@@ -134,6 +132,11 @@ impl BrainBuilder {
                 && self.connect_neighbor_neurons(&neuron_positions, &mut brain, &mut rng)
             {
                 tries -= 1;
+            }
+        }
+        for id in brain.get_neurons() {
+            if !brain.does_neuron_has_connections(id) {
+                drop(brain.kill_neuron(id));
             }
         }
 
@@ -185,7 +188,7 @@ impl BrainBuilder {
         neurons: &[NeuronID],
         brain: &mut Brain,
         rng: &mut R,
-    ) -> Option<NeuronID>
+    ) -> NeuronID
     where
         R: Rng,
     {
@@ -193,11 +196,7 @@ impl BrainBuilder {
         let origin = neurons[rng.gen_range(0, neurons.len()) % neurons.len()];
         let origin_pos = brain.neuron(origin).unwrap().position();
         let new_position = self.make_new_position(origin_pos, distance, rng);
-        let neuron = brain.create_neuron(new_position);
-        if brain.bind_neurons(origin, neuron).is_err() {
-            return None;
-        }
-        Some(neuron)
+        brain.create_neuron(new_position)
     }
 
     fn connect_neighbor_neurons<R>(
