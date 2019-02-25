@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 pub mod activity {
     pub const NONE: usize = 0;
-    pub const CONNECTIONS: usize = 1 << 0;
+    pub const CONNECTIONS: usize = 1;
     pub const IMPULSES: usize = 1 << 1;
     pub const SENSORS: usize = 1 << 2;
     pub const EFFECTORS: usize = 1 << 3;
@@ -202,6 +202,29 @@ impl Brain {
         self.synapses.len()
     }
 
+    #[inline]
+    pub fn get_impulses_count(&self) -> usize {
+        self.synapses.iter().map(|s| s.impulses.len()).sum()
+    }
+
+    #[inline]
+    pub fn get_impulses_potential(&self) -> Scalar {
+        self.synapses
+            .iter()
+            .map(|s| s.impulses.iter().map(|i| i.potential).sum::<Scalar>())
+            .sum::<Scalar>()
+    }
+
+    #[inline]
+    pub fn get_neurons_potential(&self) -> Scalar {
+        self.neurons.iter().map(|n| n.potential()).sum()
+    }
+
+    #[inline]
+    pub fn get_potential(&self) -> Scalar {
+        self.get_neurons_potential() + self.get_impulses_potential()
+    }
+
     pub fn clear(&mut self) {
         self.neurons.clear();
         self.synapses.clear();
@@ -284,10 +307,7 @@ impl Brain {
     pub fn sensor_trigger_impulse(&mut self, id: SensorID, potential: Scalar) -> Result<()> {
         if let Some(sensor) = self.sensors.iter().find(|s| s.id == id) {
             if let Some(neuron) = self.neurons.iter_mut().find(|n| n.id() == sensor.target) {
-                neuron.push_impulse(Impulse {
-                    value: potential,
-                    timeout: self.config.neuron_impulse_decay,
-                });
+                neuron.push_potential(potential);
                 Ok(())
             } else {
                 Err(Error::NeuronDoesNotExists(sensor.target))
@@ -374,25 +394,11 @@ impl Brain {
                 if self.are_neurons_connected(from, to) {
                     return Ok(false);
                 }
-                if !self.config.allow_sensors_both_way_connections {
-                    if let Some(sensor) = self.sensors.iter().find(|s| s.target == to) {
-                        return Err(Error::BindingNeuronToSensor(to, sensor.id));
-                    }
+                if let Some(sensor) = self.sensors.iter().find(|s| s.target == to) {
+                    return Err(Error::BindingNeuronToSensor(to, sensor.id));
                 }
-                if !self.config.allow_effectors_both_way_connections {
-                    if let Some(effector) = self.effectors.iter().find(|e| e.source == from) {
-                        return Err(Error::BindingEffectorToNeuron(effector.id, from));
-                    }
-                }
-                if self.config.only_one_outgoing_neuron_connection
-                    && self.synapses.iter().any(|s| s.source == from)
-                {
-                    return Err(Error::NeuronAlreadyHasOutgoingConnection(from));
-                }
-                if self.config.only_one_incoming_neuron_connection
-                    && self.synapses.iter().any(|s| s.target == to)
-                {
-                    return Err(Error::NeuronAlreadyHasIncomingConnection(to));
+                if let Some(effector) = self.effectors.iter().find(|e| e.source == from) {
+                    return Err(Error::BindingEffectorToNeuron(effector.id, from));
                 }
                 let distance = source.position().distance(target.position());
                 self.synapses.push(Synapse {
@@ -443,272 +449,142 @@ impl Brain {
         if self.neurons.is_empty() {
             return Ok(());
         }
-        let mut rng = thread_rng();
 
-        // neuron input processing phase.
+        let Config {
+            propagation_speed,
+            action_potential_treshold,
+            synapse_inactivity_time,
+            neuron_potential_decay,
+            synapse_overdose_receptors,
+            receptors_excitation,
+            receptors_inhibition,
+            new_connections_delay,
+            synapse_propagation_decay,
+            ..
+        } = self.config;
+
+        // potential summation phase.
         {
-            for neuron in &mut self.neurons {
-                let impulse_sum = neuron.input_impulses().iter().fold(0.0, |a, i| a + i.value);
-                if impulse_sum >= self.config.action_potential_treshold {
-                    for s in self.synapses.iter_mut().filter(|s| s.source == neuron.id()) {
-                        if s.inactivity <= 0.0 {
-                            let under = if let Some(o) = self.config.synapse_overdose_receptors {
+            let dtpd = delta_time * neuron_potential_decay;
+            let neurons_triggering = self
+                .neurons
+                .par_iter_mut()
+                .filter_map(|neuron| {
+                    let potential = neuron.potential();
+                    let status = if potential >= action_potential_treshold {
+                        neuron.fire();
+                        true
+                    } else {
+                        false
+                    };
+                    neuron.process_potential(dtpd);
+                    if status {
+                        Some((neuron.id(), potential))
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>();
+            for (id, p) in neurons_triggering {
+                let count = self
+                    .synapses
+                    .par_iter()
+                    .filter(|s| s.inactivity <= 0.0 && s.source == id)
+                    .count();
+                if count > 0 {
+                    let p = p / count as Scalar;
+                    self.synapses
+                        .par_iter_mut()
+                        .filter(|s| s.inactivity <= 0.0 && s.source == id)
+                        .for_each(|s| {
+                            let under = if let Some(o) = synapse_overdose_receptors {
                                 s.receptors < o
                             } else {
                                 true
                             };
                             if under {
                                 s.impulses.push(Impulse {
-                                    value: self.config.default_action_potential,
+                                    potential: p,
                                     timeout: s.distance,
                                 });
                             }
-                            s.inactivity = self.config.synapse_inactivity_time;
-                        }
-                    }
-                    neuron.clear_input_impulses();
+                            s.inactivity = synapse_inactivity_time;
+                        });
                 }
-                neuron.set_accumulated_impulse(impulse_sum);
-                neuron.process_input_impulses(delta_time, self.config.propagation_speed);
             }
+            // self.synapses.par_iter_mut().for_each(|s| {
+            //     if s.inactivity <= 0.0 {
+            //         let sid = s.source;
+            //         if let Some((_, p)) = neurons_triggering.iter().find(|(id, _)| sid == *id) {
+            //             let under = if let Some(o) = synapse_overdose_receptors {
+            //                 s.receptors < o
+            //             } else {
+            //                 true
+            //             };
+            //             if under {
+            //                 s.impulses.push(Impulse {
+            //                     potential: *p,
+            //                     timeout: s.distance,
+            //                 });
+            //             }
+            //             s.inactivity = synapse_inactivity_time;
+            //         }
+            //     }
+            // });
         }
 
-        // synapse propagation phase.
+        // impulse propagation phase.
         {
-            let mut neurons_to_trigger = vec![];
-            let s = delta_time * self.config.propagation_speed;
-            let r = self.config.receptors_excitation * delta_time;
-            for synapse in &mut self.synapses {
-                let mut excitation = 0;
-                synapse.impulses = synapse
-                    .impulses
-                    .iter()
-                    .filter_map(|impulse| {
-                        let mut impulse = *impulse;
-                        impulse.timeout -= s;
-                        if impulse.timeout > 0.0 {
-                            Some(impulse)
-                        } else {
-                            neurons_to_trigger.push(synapse.target);
-                            excitation += 1;
-                            None
-                        }
-                    })
-                    .collect();
-                synapse.receptors += Scalar::from(excitation) * r;
-                synapse.inactivity = (synapse.inactivity - delta_time).max(0.0);
-            }
-            for id in neurons_to_trigger {
-                if let Some(neuron) = self.neurons.iter_mut().find(|n| n.id() == id) {
-                    neuron.push_impulse(Impulse {
-                        value: self.config.default_action_potential,
-                        timeout: self.config.neuron_impulse_decay,
-                    })
-                }
-            }
-        }
-
-        // inhibition and reconnection phase.
-        if self.config.receptors_inhibition > 0.0 {
-            let r = self.config.receptors_inhibition * delta_time;
-            for synapse in &mut self.synapses {
-                synapse.receptors -= r;
-            }
-            let mut neurons_to_reconnect = vec![];
-            let synapses_to_remove = self
-                .synapses
-                .iter()
-                .enumerate()
-                .filter_map(|(i, s)| {
-                    if s.receptors <= 0.0 {
-                        if let Some(neuron) = self.neurons.iter().find(|n| n.id() == s.source) {
-                            if let Some(id) = self.select_neuron(neuron.position(), &mut rng) {
-                                if s.source != id
-                                    && (!self.config.synapse_reconnection_no_loop
-                                        || (!self.are_neurons_connected(s.source, id)
-                                            && !self.are_neurons_connected(id, s.source)))
-                                {
-                                    neurons_to_reconnect.push((s.source, id));
-                                }
-                            }
-                        }
-                        Some(i)
-                    } else {
-                        None
-                    }
-                })
-                .collect::<Vec<_>>();
-            for index in synapses_to_remove.into_iter().rev() {
-                self.synapses.swap_remove(index);
-            }
-            for (from, to) in neurons_to_reconnect {
-                self.bind_neurons(from, to)?;
-            }
-        }
-
-        // new connections phase.
-        if self.config.new_connections_delay > 0.0 {
-            self.new_connections_accum += delta_time;
-            while self.new_connections_accum > self.config.new_connections_delay {
-                self.new_connections_accum -= self.config.new_connections_delay;
-                let neuron =
-                    &self.neurons[rng.gen_range(0, self.neurons.len()) % self.neurons.len()];
-                if let Some(id) = self.select_neuron(neuron.position(), &mut rng) {
-                    self.bind_neurons(neuron.id(), id)?;
-                }
-            }
-        }
-
-        // removing dead neurons phase.
-        if !self.config.do_not_kill_neurons {
-            let neurons_to_remove = self
-                .neurons
-                .iter()
-                .enumerate()
-                .filter_map(|(i, n)| {
-                    let id = n.id();
-                    if !self
-                        .synapses
-                        .iter()
-                        .any(|s| s.source == id || s.target == id)
-                        && !self.sensors.iter().any(|s| s.target == id)
-                        && !self.effectors.iter().any(|e| e.source == id)
-                    {
-                        Some(i)
-                    } else {
-                        None
-                    }
-                })
-                .collect::<Vec<_>>();
-            for index in neurons_to_remove.into_iter().rev() {
-                let id = self.neurons.swap_remove(index).id();
-                while let Some(index) = self
-                    .synapses
-                    .iter()
-                    .position(|s| s.source == id || s.target == id)
-                {
-                    self.synapses.swap_remove(index);
-                }
-                while let Some(index) = self.sensors.iter().position(|s| s.target == id) {
-                    self.sensors.swap_remove(index);
-                }
-                while let Some(index) = self.effectors.iter().position(|e| e.source == id) {
-                    self.effectors.swap_remove(index);
-                }
-            }
-        }
-
-        // accumulating effector potentials phase.
-        {
-            for effector in &mut self.effectors {
-                if let Some(neuron) = self.neurons.iter().find(|n| n.id() == effector.source) {
-                    effector.potential += neuron.accumulated_impulse();
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    pub fn process_parallel(&mut self, delta_time: Scalar) -> Result<()> {
-        if self.neurons.is_empty() {
-            return Ok(());
-        }
-
-        let propagation_speed = self.config.propagation_speed;
-        let action_potential_treshold = self.config.action_potential_treshold;
-        let synapse_inactivity_time = self.config.synapse_inactivity_time;
-        let default_action_potential = self.config.default_action_potential;
-        let neuron_impulse_decay = self.config.neuron_impulse_decay;
-        let synapse_overdose_receptors = self.config.synapse_overdose_receptors;
-
-        // neuron input processing phase.
-        {
-            let neurons_triggering = self
-                .neurons
-                .par_iter_mut()
-                .filter_map(|neuron| {
-                    let impulse_sum = neuron.input_impulses().iter().fold(0.0, |a, i| a + i.value);
-                    let status = if impulse_sum >= action_potential_treshold {
-                        neuron.clear_input_impulses();
-                        true
-                    } else {
-                        false
-                    };
-                    neuron.set_accumulated_impulse(impulse_sum);
-                    neuron.process_input_impulses(delta_time, propagation_speed);
-                    if status {
-                        Some(neuron.id())
-                    } else {
-                        None
-                    }
-                })
-                .collect::<Vec<_>>();
-            self.synapses.par_iter_mut().for_each(|s| {
-                if s.inactivity <= 0.0 {
-                    let sid = s.source;
-                    if neurons_triggering.iter().any(|id| sid == *id) {
-                        let under = if let Some(o) = synapse_overdose_receptors {
-                            s.receptors < o
-                        } else {
-                            true
-                        };
-                        if under {
-                            s.impulses.push(Impulse {
-                                value: default_action_potential,
-                                timeout: s.distance,
-                            });
-                        }
-                        s.inactivity = synapse_inactivity_time;
-                    }
-                }
-            });
-        }
-
-        // synapse propagation phase.
-        {
-            let s = delta_time * propagation_speed;
-            let r = self.config.receptors_excitation * delta_time;
+            let s = propagation_speed * delta_time;
+            let r = receptors_excitation * delta_time;
+            let d = synapse_propagation_decay * s;
             let neurons_to_trigger = self
                 .synapses
                 .par_iter_mut()
                 .flat_map(|synapse| {
-                    let mut excitation = 0;
-                    let mut neurons_to_trigger = Vec::with_capacity(synapse.impulses.len());
-                    synapse.impulses = synapse
-                        .impulses
-                        .iter()
-                        .filter_map(|impulse| {
-                            let mut impulse = *impulse;
-                            impulse.timeout -= s;
-                            if impulse.timeout > 0.0 {
-                                Some(impulse)
-                            } else {
-                                neurons_to_trigger.push(synapse.target);
-                                excitation += 1;
-                                None
-                            }
-                        })
-                        .collect();
-                    synapse.receptors += Scalar::from(excitation) * r;
+                    let mut estimated_count = 0;
+                    for impulse in &mut synapse.impulses {
+                        impulse.potential -= d;
+                        impulse.timeout -= s;
+                        if impulse.timeout <= 0.0 {
+                            estimated_count += 1;
+                        }
+                    }
+                    synapse.receptors += estimated_count as Scalar * r;
+                    let mut neurons_to_trigger = Vec::with_capacity(estimated_count);
+                    if estimated_count > 0 {
+                        synapse.impulses = synapse
+                            .impulses
+                            .iter()
+                            .filter_map(|impulse| {
+                                if impulse.potential <= 0.0 {
+                                    None
+                                } else if impulse.timeout > 0.0 {
+                                    Some(*impulse)
+                                } else {
+                                    neurons_to_trigger.push((synapse.target, impulse.potential));
+                                    None
+                                }
+                            })
+                            .collect();
+                    }
                     synapse.inactivity = (synapse.inactivity - delta_time).max(0.0);
                     neurons_to_trigger
                 })
                 .collect::<Vec<_>>();
             self.neurons.par_iter_mut().for_each(|neuron| {
                 let nid = neuron.id();
-                for _ in neurons_to_trigger.iter().filter(|id| nid == **id) {
-                    neuron.push_impulse(Impulse {
-                        value: default_action_potential,
-                        timeout: neuron_impulse_decay,
-                    })
+                for (id, potential) in &neurons_to_trigger {
+                    if nid == *id {
+                        neuron.push_potential(*potential);
+                    }
                 }
             });
         }
 
         // inhibition and reconnection phase.
-        if self.config.receptors_inhibition > 0.0 {
-            let r = self.config.receptors_inhibition * delta_time;
+        if receptors_inhibition > 0.0 {
+            let r = receptors_inhibition * delta_time;
             let synapses_to_remove = self
                 .synapses
                 .par_iter_mut()
@@ -722,18 +598,19 @@ impl Brain {
                     }
                 })
                 .collect::<Vec<_>>();
-            let neurons_to_reconnect = self
-                .synapses
+            let neurons_to_reconnect = synapses_to_remove
                 .par_iter()
-                .filter_map(|s| {
-                    let mut rng = thread_rng();
+                .filter_map(|index| {
+                    let s = &self.synapses[*index];
                     if s.receptors <= 0.0 {
-                        if let Some(neuron) = self.neurons.iter().find(|n| n.id() == s.source) {
+                        if let Some(neuron) =
+                            self.neurons.par_iter().find_any(|n| n.id() == s.source)
+                        {
+                            let mut rng = thread_rng();
                             if let Some(id) = self.select_neuron(neuron.position(), &mut rng) {
                                 if s.source != id
-                                    && (!self.config.synapse_reconnection_no_loop
-                                        || (!self.are_neurons_connected(s.source, id)
-                                            && !self.are_neurons_connected(id, s.source)))
+                                    && !self.are_neurons_connected(s.source, id)
+                                    && !self.are_neurons_connected(id, s.source)
                                 {
                                     return Some((s.source, id));
                                 }
@@ -752,11 +629,11 @@ impl Brain {
         }
 
         // new connections phase.
-        if self.config.new_connections_delay > 0.0 {
+        if new_connections_delay > 0.0 {
             self.new_connections_accum += delta_time;
-            while self.new_connections_accum > self.config.new_connections_delay {
+            while self.new_connections_accum > new_connections_delay {
                 let mut rng = thread_rng();
-                self.new_connections_accum -= self.config.new_connections_delay;
+                self.new_connections_accum -= new_connections_delay;
                 let neuron =
                     &self.neurons[rng.gen_range(0, self.neurons.len()) % self.neurons.len()];
                 if let Some(id) = self.select_neuron(neuron.position(), &mut rng) {
@@ -766,7 +643,7 @@ impl Brain {
         }
 
         // removing dead neurons phase.
-        if !self.config.do_not_kill_neurons {
+        {
             let neurons_to_remove = self
                 .neurons
                 .par_iter()
@@ -775,7 +652,7 @@ impl Brain {
                     let id = n.id();
                     if !self
                         .synapses
-                        .iter()
+                        .par_iter()
                         .any(|s| s.source == id || s.target == id)
                     {
                         Some(i)
@@ -788,15 +665,15 @@ impl Brain {
                 let id = self.neurons.swap_remove(index).id();
                 while let Some(index) = self
                     .synapses
-                    .iter()
-                    .position(|s| s.source == id || s.target == id)
+                    .par_iter()
+                    .position_any(|s| s.source == id || s.target == id)
                 {
                     self.synapses.swap_remove(index);
                 }
-                while let Some(index) = self.sensors.iter().position(|s| s.target == id) {
+                while let Some(index) = self.sensors.par_iter().position_any(|s| s.target == id) {
                     self.sensors.swap_remove(index);
                 }
-                while let Some(index) = self.effectors.iter().position(|e| e.source == id) {
+                while let Some(index) = self.effectors.par_iter().position_any(|e| e.source == id) {
                     self.effectors.swap_remove(index);
                 }
             }
@@ -804,17 +681,15 @@ impl Brain {
 
         // accumulating effector potentials phase.
         {
-            self.effectors = self
-                .effectors
-                .par_iter()
-                .map(|effector| {
-                    let mut effector = effector.clone();
-                    if let Some(neuron) = self.neurons.iter().find(|n| n.id() == effector.source) {
-                        effector.potential += neuron.accumulated_impulse();
-                    }
-                    effector
-                })
-                .collect::<Vec<_>>();
+            for effector in &mut self.effectors {
+                if let Some(neuron) = self
+                    .neurons
+                    .par_iter()
+                    .find_any(|n| n.id() == effector.source)
+                {
+                    effector.potential = neuron.potential();
+                }
+            }
         }
 
         Ok(())
@@ -825,8 +700,7 @@ impl Brain {
         R: Rng,
     {
         let srr = self.config.synapse_reconnection_range;
-        let roa = self.config.reconnect_only_with_active_neurons;
-        if !roa && srr.is_none() {
+        if srr.is_none() {
             return if self.neurons.is_empty() {
                 None
             } else {
@@ -837,9 +711,7 @@ impl Brain {
             .neurons
             .iter()
             .filter_map(|neuron| {
-                if (!roa || neuron.is_active())
-                    && (srr.is_none() || neuron.position().distance(position) < srr.unwrap())
-                {
+                if neuron.position().distance(position) < srr.unwrap() {
                     Some(neuron.id())
                 } else {
                     None
@@ -859,78 +731,6 @@ impl Brain {
     }
 
     pub fn build_activity_map(&self, flags: usize) -> BrainActivityMap {
-        let connections = if flags & activity::CONNECTIONS != 0 {
-            self.synapses
-                .iter()
-                .map(|s| {
-                    let from = self.neuron(s.source).unwrap().position();
-                    let to = self.neuron(s.target).unwrap().position();
-                    (from, to, s.receptors)
-                })
-                .collect()
-        } else {
-            vec![]
-        };
-        let impulses = if flags & activity::IMPULSES != 0 {
-            self.synapses
-                .iter()
-                .map(|s| {
-                    let from = self.neuron(s.source).unwrap().position();
-                    let to = self.neuron(s.target).unwrap().position();
-                    let distance = from.distance(to);
-                    s.impulses
-                        .iter()
-                        .map(|i| {
-                            let factor = if distance > 0.0 {
-                                1.0 - i.timeout.max(0.0).min(distance) / distance
-                            } else {
-                                0.0
-                            };
-                            (from, to, factor)
-                        })
-                        .collect::<Vec<_>>()
-                })
-                .flatten()
-                .collect()
-        } else {
-            vec![]
-        };
-        let sensors = if flags & activity::SENSORS != 0 {
-            self.sensors
-                .iter()
-                .map(|s| self.neuron(s.target).unwrap().position())
-                .collect()
-        } else {
-            vec![]
-        };
-        let effectors = if flags & activity::EFFECTORS != 0 {
-            self.effectors
-                .iter()
-                .map(|e| self.neuron(e.source).unwrap().position())
-                .collect()
-        } else {
-            vec![]
-        };
-        let neurons = if flags & activity::NEURONS != 0 {
-            self.neurons.iter().map(|n| n.position()).collect()
-        } else {
-            vec![]
-        };
-        BrainActivityMap {
-            connections,
-            impulses,
-            sensors,
-            effectors,
-            neurons,
-        }
-    }
-
-    #[inline]
-    pub fn build_activity_map_parallel_default(&self) -> BrainActivityMap {
-        self.build_activity_map_parallel(activity::ALL)
-    }
-
-    pub fn build_activity_map_parallel(&self, flags: usize) -> BrainActivityMap {
         let connections = if flags & activity::CONNECTIONS != 0 {
             self.synapses
                 .par_iter()
@@ -994,18 +794,6 @@ impl Brain {
             sensors,
             effectors,
             neurons,
-        }
-    }
-
-    pub fn ignite_random_synapses(&mut self, count: usize) {
-        let mut rng = thread_rng();
-        for _ in 0..count {
-            let index = rng.gen_range(0, self.synapses.len()) % self.synapses.len();
-            let synapse = &mut self.synapses[index];
-            synapse.impulses.push(Impulse {
-                value: self.config.default_action_potential,
-                timeout: rng.gen_range(0.0, synapse.distance),
-            });
         }
     }
 }

@@ -5,8 +5,7 @@ use serde::{Deserialize, Serialize};
 #[repr(C)]
 pub struct Config {
     pub propagation_speed: Scalar,
-    pub neuron_impulse_decay: Scalar,
-    pub default_action_potential: Scalar,
+    pub neuron_potential_decay: Scalar,
     pub action_potential_treshold: Scalar,
     pub receptors_excitation: Scalar,
     pub receptors_inhibition: Scalar,
@@ -15,36 +14,23 @@ pub struct Config {
     pub synapse_inactivity_time: Scalar,
     pub synapse_reconnection_range: Option<Scalar>,
     pub synapse_overdose_receptors: Option<Scalar>,
-    pub synapse_reconnection_no_loop: bool,
-    pub allow_sensors_both_way_connections: bool,
-    pub allow_effectors_both_way_connections: bool,
-    pub only_one_outgoing_neuron_connection: bool,
-    pub only_one_incoming_neuron_connection: bool,
-    pub do_not_kill_neurons: bool,
-    pub reconnect_only_with_active_neurons: bool,
+    pub synapse_propagation_decay: Scalar,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
             propagation_speed: 1.0,
-            neuron_impulse_decay: 0.1,
-            default_action_potential: 1.0,
+            neuron_potential_decay: 1.0,
             action_potential_treshold: 1.0,
             receptors_excitation: 1.0,
-            receptors_inhibition: 0.1,
+            receptors_inhibition: 0.05,
             default_receptors: (0.5, 1.5),
             new_connections_delay: 0.0,
-            synapse_inactivity_time: 0.1,
+            synapse_inactivity_time: 0.05,
             synapse_reconnection_range: None,
-            synapse_overdose_receptors: Some(10.0),
-            synapse_reconnection_no_loop: true,
-            allow_sensors_both_way_connections: false,
-            allow_effectors_both_way_connections: false,
-            only_one_outgoing_neuron_connection: true,
-            only_one_incoming_neuron_connection: false,
-            do_not_kill_neurons: false,
-            reconnect_only_with_active_neurons: false,
+            synapse_overdose_receptors: None,
+            synapse_propagation_decay: 0.0,
         }
     }
 }
@@ -53,13 +39,9 @@ impl Config {
     pub fn merge(&self, other: &Self) -> Self {
         Self {
             propagation_speed: merge_scalar(self.propagation_speed, other.propagation_speed),
-            neuron_impulse_decay: merge_scalar(
-                self.neuron_impulse_decay,
-                other.neuron_impulse_decay,
-            ),
-            default_action_potential: merge_scalar(
-                self.default_action_potential,
-                other.default_action_potential,
+            neuron_potential_decay: merge_scalar(
+                self.neuron_potential_decay,
+                other.neuron_potential_decay,
             ),
             action_potential_treshold: merge_scalar(
                 self.action_potential_treshold,
@@ -103,19 +85,10 @@ impl Config {
                 (None, Some(b)) => Some(b),
                 (Some(a), Some(b)) => Some(merge_scalar(a, b)),
             },
-            synapse_reconnection_no_loop: self.synapse_reconnection_no_loop
-                || other.synapse_reconnection_no_loop,
-            allow_sensors_both_way_connections: self.allow_sensors_both_way_connections
-                || other.allow_sensors_both_way_connections,
-            allow_effectors_both_way_connections: self.allow_effectors_both_way_connections
-                || other.allow_effectors_both_way_connections,
-            only_one_outgoing_neuron_connection: self.only_one_outgoing_neuron_connection
-                || other.only_one_outgoing_neuron_connection,
-            only_one_incoming_neuron_connection: self.only_one_incoming_neuron_connection
-                || other.only_one_incoming_neuron_connection,
-            do_not_kill_neurons: self.do_not_kill_neurons || other.do_not_kill_neurons,
-            reconnect_only_with_active_neurons: self.reconnect_only_with_active_neurons
-                || other.reconnect_only_with_active_neurons,
+            synapse_propagation_decay: merge_scalar(
+                self.synapse_propagation_decay,
+                other.synapse_propagation_decay,
+            ),
         }
     }
 }

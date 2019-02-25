@@ -16,8 +16,6 @@ pub enum Error {
     BindingEffectorToNeuron(EffectorID, NeuronID),
     NeuronIsAlreadyConnectedToSensor(NeuronID, SensorID),
     NeuronIsAlreadyConnectedToEffector(NeuronID, EffectorID),
-    NeuronAlreadyHasOutgoingConnection(NeuronID),
-    NeuronAlreadyHasIncomingConnection(NeuronID),
 }
 
 impl Error {

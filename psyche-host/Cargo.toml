@@ -1,16 +1,13 @@
 [package]
-name = "psyche-serde"
+name = "psyche-host"
 version = "0.2.4"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 edition = "2018"
-description = "Serialize/Deserialize module for Psyche AI Toolset"
+description = "Host module for Psyche AI Toolset"
 license = "MIT"
 homepage = "https://github.com/PsichiX/psyche"
 repository = "https://github.com/PsichiX/psyche"
-documentation = "https://docs.rs/psyche-serde"
+documentation = "https://docs.rs/psyche-host"
 
 [dependencies]
 psyche-core = { version = "0.2", path = "../psyche-core" }
-serde_json = "1.0"
-bincode = "1.1"
-serde_yaml = "0.8"

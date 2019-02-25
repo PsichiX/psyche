@@ -129,7 +129,7 @@ impl BrainBuilder {
         for _ in 0..self.connections {
             let mut tries = self.max_connecting_tries + 1;
             while tries > 0
-                && self.connect_neighbor_neurons(&neuron_positions, &mut brain, &mut rng)
+                && !self.connect_neighbor_neurons(&neuron_positions, &mut brain, &mut rng)
             {
                 tries -= 1;
             }

@@ -8,7 +8,7 @@ pub type NeuronID = ID<Neuron>;
 #[derive(Debug, Default, Copy, Clone, PartialEq, Serialize, Deserialize)]
 #[repr(C)]
 pub struct Impulse {
-    pub value: Scalar,
+    pub potential: Scalar,
     pub timeout: Scalar,
 }
 
@@ -60,8 +60,7 @@ pub struct Neuron {
     id: NeuronID,
     owner_id: BrainID,
     position: Position,
-    input_impulses: Vec<Impulse>,
-    accumulated_impulse: Scalar,
+    potential: Scalar,
 }
 
 impl Neuron {
@@ -70,8 +69,7 @@ impl Neuron {
             id: Default::default(),
             owner_id,
             position,
-            input_impulses: vec![],
-            accumulated_impulse: 0.0,
+            potential: 0.0,
         }
     }
 
@@ -80,8 +78,7 @@ impl Neuron {
             id,
             owner_id,
             position,
-            input_impulses: vec![],
-            accumulated_impulse: 0.0,
+            potential: 0.0,
         }
     }
 
@@ -101,50 +98,28 @@ impl Neuron {
     }
 
     #[inline]
-    pub fn is_active(&self) -> bool {
-        !self.input_impulses.is_empty()
+    pub fn potential(&self) -> Scalar {
+        self.potential
     }
 
     #[inline]
-    pub fn accumulated_impulse(&self) -> Scalar {
-        self.accumulated_impulse
+    pub(crate) fn push_potential(&mut self, value: Scalar) {
+        self.potential += value;
     }
 
     #[inline]
-    pub fn input_impulses(&self) -> &[Impulse] {
-        &self.input_impulses
+    pub(crate) fn process_potential(&mut self, delta_time_times_decay: Scalar) {
+        if self.potential < -delta_time_times_decay {
+            self.potential = (self.potential + delta_time_times_decay).min(0.0);
+        } else if self.potential > delta_time_times_decay {
+            self.potential = (self.potential - delta_time_times_decay).max(0.0);
+        } else {
+            self.potential = 0.0;
+        }
     }
 
     #[inline]
-    pub(crate) fn push_impulse(&mut self, impulse: Impulse) {
-        self.input_impulses.push(impulse);
-    }
-
-    #[inline]
-    pub(crate) fn process_input_impulses(&mut self, delta_time: Scalar, propagation_speed: Scalar) {
-        let s = delta_time * propagation_speed;
-        self.input_impulses = self
-            .input_impulses
-            .iter()
-            .filter_map(|impulse| {
-                let mut impulse = *impulse;
-                impulse.timeout -= s;
-                if impulse.timeout > 0.0 {
-                    Some(impulse)
-                } else {
-                    None
-                }
-            })
-            .collect();
-    }
-
-    #[inline]
-    pub(crate) fn set_accumulated_impulse(&mut self, value: Scalar) {
-        self.accumulated_impulse = value;
-    }
-
-    #[inline]
-    pub(crate) fn clear_input_impulses(&mut self) {
-        self.input_impulses.clear();
+    pub(crate) fn fire(&mut self) {
+        self.potential = 0.0;
     }
 }

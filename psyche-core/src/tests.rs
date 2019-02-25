@@ -30,16 +30,15 @@ fn test_brain() {
     assert!(brain.bind_neurons(n3, n1).is_err());
     brain.sensor_trigger_impulse(s1, 10.0).unwrap();
 
-    for _ in 0..10 {
+    for _ in 0..4 {
         brain.process(1.0).unwrap();
     }
-    // println!("{:#?}", brain);
     assert!(brain.effector_potential_release(e1).unwrap() > 0.0);
 }
 
 #[test]
 fn test_brain_builder() {
-    let mut brain = BrainBuilder::new()
+    let brain = BrainBuilder::new()
         .config(Config::default())
         .neurons(1000)
         .connections(1000)
@@ -49,7 +48,6 @@ fn test_brain_builder() {
         .sensors(10)
         .effectors(10)
         .build();
-    brain.ignite_random_synapses(brain.synapses_count() / 2);
     // println!("brain: {:#?}", brain);
     // println!("neurons: {}", brain.get_neurons().len());
     // println!("synapses: {}", brain.synapses_count());
@@ -81,7 +79,7 @@ fn test_offspring_builder() {
         .sensors(10)
         .effectors(10)
         .build();
-    let mut brain = OffspringBuilder::new()
+    let brain = OffspringBuilder::new()
         .new_neurons(200)
         .new_connections(1000)
         .min_neurogenesis_range(0.1)
@@ -90,7 +88,6 @@ fn test_offspring_builder() {
         .new_sensors(0)
         .new_effectors(0)
         .build_merged(&brain_a, &brain_b);
-    brain.ignite_random_synapses(brain.synapses_count() / 2);
     // println!(
     //     "neurons: {} x {} = {}",
     //     brain_a.get_neurons().len(),
