@@ -10,11 +10,11 @@ pub struct Config {
     pub receptors_excitation: Scalar,
     pub receptors_inhibition: Scalar,
     pub default_receptors: (Scalar, Scalar),
-    pub new_connections_delay: Scalar,
     pub synapse_inactivity_time: Scalar,
     pub synapse_reconnection_range: Option<Scalar>,
     pub synapse_overdose_receptors: Option<Scalar>,
     pub synapse_propagation_decay: Scalar,
+    pub synapse_new_connection_receptors: Option<Scalar>,
 }
 
 impl Default for Config {
@@ -26,11 +26,11 @@ impl Default for Config {
             receptors_excitation: 1.0,
             receptors_inhibition: 0.05,
             default_receptors: (0.5, 1.5),
-            new_connections_delay: 0.0,
             synapse_inactivity_time: 0.05,
             synapse_reconnection_range: None,
             synapse_overdose_receptors: None,
             synapse_propagation_decay: 0.0,
+            synapse_new_connection_receptors: None,
         }
     }
 }
@@ -59,10 +59,6 @@ impl Config {
                 merge_scalar(self.default_receptors.0, other.default_receptors.0),
                 merge_scalar(self.default_receptors.1, other.default_receptors.1),
             ),
-            new_connections_delay: merge_scalar(
-                self.new_connections_delay,
-                other.new_connections_delay,
-            ),
             synapse_inactivity_time: merge_scalar(
                 self.synapse_inactivity_time,
                 other.synapse_inactivity_time,
@@ -71,24 +67,33 @@ impl Config {
                 self.synapse_reconnection_range,
                 other.synapse_reconnection_range,
             ) {
-                (None, None) => None,
+                (Some(a), Some(b)) => Some(merge_scalar(a, b)),
                 (Some(a), None) => Some(a),
                 (None, Some(b)) => Some(b),
-                (Some(a), Some(b)) => Some(merge_scalar(a, b)),
+                _ => None,
             },
             synapse_overdose_receptors: match (
                 self.synapse_overdose_receptors,
                 other.synapse_overdose_receptors,
             ) {
-                (None, None) => None,
+                (Some(a), Some(b)) => Some(merge_scalar(a, b)),
                 (Some(a), None) => Some(a),
                 (None, Some(b)) => Some(b),
-                (Some(a), Some(b)) => Some(merge_scalar(a, b)),
+                _ => None,
             },
             synapse_propagation_decay: merge_scalar(
                 self.synapse_propagation_decay,
                 other.synapse_propagation_decay,
             ),
+            synapse_new_connection_receptors: match (
+                self.synapse_new_connection_receptors,
+                other.synapse_new_connection_receptors,
+            ) {
+                (Some(a), Some(b)) => Some(merge_scalar(a, b)),
+                (Some(a), None) => Some(a),
+                (None, Some(b)) => Some(b),
+                _ => None,
+            },
         }
     }
 }

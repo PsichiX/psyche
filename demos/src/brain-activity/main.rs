@@ -6,7 +6,7 @@ extern crate rand;
 use cgmath::*;
 use piston_window::*;
 use psyche::core::brain::activity;
-use psyche::core::brain::Brain;
+use psyche::core::brain::{Brain, BrainActivityStats};
 use psyche::core::brain_builder::BrainBuilder;
 use psyche::core::config::Config;
 use psyche::core::neuron::Position;
@@ -16,16 +16,20 @@ use std::time::Instant;
 
 fn make_brain() -> Brain {
     let mut config = Config::default();
-    config.propagation_speed = 100.0;
+    config.propagation_speed = 50.0;
     config.synapse_reconnection_range = Some(15.0);
     // config.synapse_overdose_receptors = Some(10.0);
+    // config.neuron_potential_decay = 0.1;
+    config.synapse_propagation_decay = 0.01;
+    config.synapse_new_connection_receptors = Some(2.0);
+    config.action_potential_treshold = 0.1;
 
     BrainBuilder::new()
         .config(config)
-        .neurons(1000)
-        .connections(2000)
+        .neurons(3000)
+        .connections(5000)
         .min_neurogenesis_range(5.0)
-        .max_neurogenesis_range(20.0)
+        .max_neurogenesis_range(15.0)
         .radius(50.0)
         .sensors(50)
         .effectors(25)
@@ -46,34 +50,6 @@ fn make_brain() -> Brain {
     // brain
 }
 
-fn point(point: Position, rot: &Quaternion<Scalar>) -> (Scalar, Scalar) {
-    let p = Point3::new(point.x, point.y, point.z);
-    let p = rot.rotate_point(p);
-    (p.x, p.y)
-}
-
-fn connection_into_line(pair: &(Position, Position, Scalar), rot: &Quaternion<Scalar>) -> [f64; 4] {
-    let p0 = Point3::new(pair.0.x, pair.0.y, pair.0.z);
-    let p1 = Point3::new(pair.1.x, pair.1.y, pair.1.z);
-    let p0 = rot.rotate_point(p0);
-    let p1 = rot.rotate_point(p1);
-    [p0.x, p0.y, p1.x, p1.y]
-}
-
-fn impulse_into_point(
-    impulse: &(Position, Position, Scalar),
-    rot: &Quaternion<Scalar>,
-) -> (Scalar, Scalar) {
-    point(
-        Position {
-            x: (impulse.1.x - impulse.0.x) * impulse.2 + impulse.0.x,
-            y: (impulse.1.y - impulse.0.y) * impulse.2 + impulse.0.y,
-            z: (impulse.1.z - impulse.0.z) * impulse.2 + impulse.0.z,
-        },
-        rot,
-    )
-}
-
 fn main() {
     let mut window: PistonWindow =
         WindowSettings::new("Psyche - Brain Activity Visualizer", [600, 600])
@@ -84,11 +60,11 @@ fn main() {
     // let mut brain =
     //     psyche_serde::bytes::brain_from_bytes(&::std::fs::read("./brain.bin").unwrap()).unwrap();
     let mut brain = make_brain();
-    // drop(::std::fs::write(
-    //     "./brain.bin",
-    //     &psyche_serde::bytes::brain_to_bytes(&brain).unwrap(),
-    // ));
-    // brain.ignite_random_synapses(brain.synapses_count());
+    drop(::std::fs::write(
+        "./brain.bin",
+        &psyche::serde::bytes::brain_to_bytes(&brain).unwrap(),
+    ));
+    // brain.ignite_random_synapses(brain.synapses_count(), (1.0, 1.0));
 
     let vx = 300.0;
     let vy = 300.0;
@@ -101,14 +77,18 @@ fn main() {
     let mut hold_rot_y = 0.0;
     let mut rot_x = 0.0;
     let mut rot_y = 0.0;
-    let rot_speed = 45.0;
+    let rot_speed = 90.0;
     let mut rot = Quaternion::zero();
     let mut trigger_sensors = true;
-    let trigger_sensors_delay = 0.05;
+    let trigger_sensors_delay = 0.1;
     let activity_flags = activity::CONNECTIONS | activity::IMPULSES;
+    // let activity_flags =
+    //     activity::CONNECTIONS | activity::IMPULSES | activity::SENSORS | activity::EFFECTORS;
     let mut activity_map = Default::default();
     let mut activity_dirty = true;
-    let fps = 30;
+    let mut activity_stats = false;
+    let fps = 60;
+    let sensor_potential = 5.0;
 
     window.set_max_fps(fps);
     window.set_ups(fps);
@@ -132,12 +112,17 @@ fn main() {
                                 trigger_sensors = !trigger_sensors;
                             }
                         }
+                        keyboard::Key::Y => {
+                            if let ButtonState::Press = button.state {
+                                activity_stats = !activity_stats;
+                            }
+                        }
                         keyboard::Key::W => match button.state {
-                            ButtonState::Press => hold_rot_y = 1.0,
+                            ButtonState::Press => hold_rot_y = -1.0,
                             ButtonState::Release => hold_rot_y = 0.0,
                         },
                         keyboard::Key::S => match button.state {
-                            ButtonState::Press => hold_rot_y = -1.0,
+                            ButtonState::Press => hold_rot_y = 1.0,
                             ButtonState::Release => hold_rot_y = 0.0,
                         },
                         keyboard::Key::A => match button.state {
@@ -151,7 +136,7 @@ fn main() {
                         keyboard::Key::Return => {
                             if let ButtonState::Press = button.state {
                                 for sensor in brain.get_sensors() {
-                                    drop(brain.sensor_trigger_impulse(sensor, 1.0));
+                                    drop(brain.sensor_trigger_impulse(sensor, sensor_potential));
                                 }
                             }
                         }
@@ -175,7 +160,7 @@ fn main() {
                         let mut rng = thread_rng();
                         for sensor in brain.get_sensors() {
                             if rng.gen() {
-                                drop(brain.sensor_trigger_impulse(sensor, 1.0));
+                                drop(brain.sensor_trigger_impulse(sensor, sensor_potential));
                             }
                         }
                     }
@@ -183,10 +168,15 @@ fn main() {
                 drop(brain.process(dt));
                 activity_dirty = true;
                 println!("processing: {:?}", now.elapsed());
-                println!("- neurons: {:?}", brain.neurons().len());
-                println!("- synapses: {:?}", brain.synapses_count());
-                println!("- potential: {:?}", brain.get_potential());
-                println!("delta_time: {:?} / {:?} ({:?})", (1.0 / dt) as usize, fps, dt);
+                println!(
+                    "delta_time: {:?} / {:?} ({:?})",
+                    (1.0 / dt) as usize,
+                    fps,
+                    dt
+                );
+                if activity_stats {
+                    print_stats(brain.build_activity_stats());
+                }
             }
             if activity_dirty {
                 activity_map = brain.build_activity_map(activity_flags);
@@ -257,4 +247,60 @@ fn main() {
             });
         }
     }
+}
+
+fn point(point: Position, rot: &Quaternion<Scalar>) -> (Scalar, Scalar) {
+    let p = Point3::new(point.x, point.y, point.z);
+    let p = rot.rotate_point(p);
+    (p.x, p.y)
+}
+
+fn connection_into_line(pair: &(Position, Position, Scalar), rot: &Quaternion<Scalar>) -> [f64; 4] {
+    let p0 = Point3::new(pair.0.x, pair.0.y, pair.0.z);
+    let p1 = Point3::new(pair.1.x, pair.1.y, pair.1.z);
+    let p0 = rot.rotate_point(p0);
+    let p1 = rot.rotate_point(p1);
+    [p0.x, p0.y, p1.x, p1.y]
+}
+
+fn impulse_into_point(
+    impulse: &(Position, Position, Scalar),
+    rot: &Quaternion<Scalar>,
+) -> (Scalar, Scalar) {
+    point(
+        Position {
+            x: (impulse.1.x - impulse.0.x) * impulse.2 + impulse.0.x,
+            y: (impulse.1.y - impulse.0.y) * impulse.2 + impulse.0.y,
+            z: (impulse.1.z - impulse.0.z) * impulse.2 + impulse.0.z,
+        },
+        rot,
+    )
+}
+
+fn print_stats(stats: BrainActivityStats) {
+    println!("=== BRAIN ACTIVITY STATS ===");
+    println!("Count:");
+    println!("- neurons: {}", stats.neurons_count);
+    println!("- synapses: {}", stats.synapses_count);
+    println!("- impulses: {}", stats.impulses_count);
+    println!("Potential:");
+    println!("- neurons: {}", stats.neurons_potential.0);
+    println!("  - min: {}", stats.neurons_potential.1);
+    println!("  - max: {}", stats.neurons_potential.2);
+    println!("- impulses: {}", stats.impulses_potential.0);
+    println!("  - min: {}", stats.impulses_potential.1);
+    println!("  - max: {}", stats.impulses_potential.2);
+    println!("- all: {}", stats.all_potential.0);
+    println!("  - min: {}", stats.all_potential.1);
+    println!("  - max: {}", stats.all_potential.2);
+    println!("Neurons connections:");
+    println!("- Incoming:");
+    println!("  - min: {}", stats.incoming_neuron_connections.0);
+    println!("  - max: {}", stats.incoming_neuron_connections.1);
+    println!("- Outgoing:");
+    println!("  - min: {}", stats.outgoing_neuron_connections.0);
+    println!("  - max: {}", stats.outgoing_neuron_connections.1);
+    println!("Synapses receptors:");
+    println!("- min: {}", stats.synapses_receptors.0);
+    println!("- max: {}", stats.synapses_receptors.1);
 }

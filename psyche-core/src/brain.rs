@@ -35,6 +35,27 @@ pub struct BrainActivityMap {
     // point
     pub neurons: Vec<Position>,
 }
+
+#[derive(Debug, Clone, Default)]
+#[repr(C)]
+pub struct BrainActivityStats {
+    pub neurons_count: usize,
+    pub synapses_count: usize,
+    pub impulses_count: usize,
+    // (current, min, max)
+    pub neurons_potential: (Scalar, Scalar, Scalar),
+    // (current, min, max)
+    pub impulses_potential: (Scalar, Scalar, Scalar),
+    // (current, min, max)
+    pub all_potential: (Scalar, Scalar, Scalar),
+    // (min, max)
+    pub incoming_neuron_connections: (usize, usize),
+    // (min, max)
+    pub outgoing_neuron_connections: (usize, usize),
+    // (min, max)
+    pub synapses_receptors: (Scalar, Scalar),
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Brain {
     id: BrainID,
@@ -53,18 +74,26 @@ impl Brain {
 
     pub fn duplicate(&self) -> Self {
         let id = Default::default();
-        let neuron_indices = self.neurons.iter().map(|n| n.id()).collect::<Vec<_>>();
+        let neuron_indices = self.neurons.par_iter().map(|n| n.id()).collect::<Vec<_>>();
         let neurons = self
             .neurons
-            .iter()
+            .par_iter()
             .map(|n| Neuron::new(id, n.position()))
             .collect::<Vec<_>>();
         let synapses = self
             .synapses
-            .iter()
+            .par_iter()
             .map(|s| Synapse {
-                source: neurons[neuron_indices.iter().position(|n| *n == s.source).unwrap()].id(),
-                target: neurons[neuron_indices.iter().position(|n| *n == s.target).unwrap()].id(),
+                source: neurons[neuron_indices
+                    .par_iter()
+                    .position_any(|n| *n == s.source)
+                    .unwrap()]
+                .id(),
+                target: neurons[neuron_indices
+                    .par_iter()
+                    .position_any(|n| *n == s.target)
+                    .unwrap()]
+                .id(),
                 distance: s.distance,
                 receptors: s.receptors,
                 impulses: vec![],
@@ -73,18 +102,26 @@ impl Brain {
             .collect::<Vec<_>>();
         let sensors = self
             .sensors
-            .iter()
+            .par_iter()
             .map(|s| Sensor {
                 id: s.id,
-                target: neurons[neuron_indices.iter().position(|n| *n == s.target).unwrap()].id(),
+                target: neurons[neuron_indices
+                    .par_iter()
+                    .position_any(|n| *n == s.target)
+                    .unwrap()]
+                .id(),
             })
             .collect::<Vec<_>>();
         let effectors = self
             .effectors
-            .iter()
+            .par_iter()
             .map(|e| Effector {
                 id: e.id,
-                source: neurons[neuron_indices.iter().position(|n| *n == e.source).unwrap()].id(),
+                source: neurons[neuron_indices
+                    .par_iter()
+                    .position_any(|n| *n == e.source)
+                    .unwrap()]
+                .id(),
                 potential: 0.0,
             })
             .collect::<Vec<_>>();
@@ -184,17 +221,17 @@ impl Brain {
 
     #[inline]
     pub fn get_neurons(&self) -> Vec<NeuronID> {
-        self.neurons.iter().map(|n| n.id()).collect()
+        self.neurons.par_iter().map(|n| n.id()).collect()
     }
 
     #[inline]
     pub fn get_sensors(&self) -> Vec<SensorID> {
-        self.sensors.iter().map(|s| s.id).collect()
+        self.sensors.par_iter().map(|s| s.id).collect()
     }
 
     #[inline]
     pub fn get_effectors(&self) -> Vec<EffectorID> {
-        self.effectors.iter().map(|e| e.id).collect()
+        self.effectors.par_iter().map(|e| e.id).collect()
     }
 
     #[inline]
@@ -204,20 +241,20 @@ impl Brain {
 
     #[inline]
     pub fn get_impulses_count(&self) -> usize {
-        self.synapses.iter().map(|s| s.impulses.len()).sum()
+        self.synapses.par_iter().map(|s| s.impulses.len()).sum()
     }
 
     #[inline]
     pub fn get_impulses_potential(&self) -> Scalar {
         self.synapses
-            .iter()
-            .map(|s| s.impulses.iter().map(|i| i.potential).sum::<Scalar>())
+            .par_iter()
+            .map(|s| s.impulses.par_iter().map(|i| i.potential).sum::<Scalar>())
             .sum::<Scalar>()
     }
 
     #[inline]
     pub fn get_neurons_potential(&self) -> Scalar {
-        self.neurons.iter().map(|n| n.potential()).sum()
+        self.neurons.par_iter().map(|n| n.potential()).sum()
     }
 
     #[inline]
@@ -249,12 +286,12 @@ impl Brain {
 
     #[inline]
     pub fn neuron(&self, id: NeuronID) -> Option<&Neuron> {
-        self.neurons.iter().find(|n| n.id() == id)
+        self.neurons.par_iter().find_any(|n| n.id() == id)
     }
 
     #[inline]
     pub fn neuron_mut(&mut self, id: NeuronID) -> Option<&mut Neuron> {
-        self.neurons.iter_mut().find(|n| n.id() == id)
+        self.neurons.par_iter_mut().find_any(|n| n.id() == id)
     }
 
     #[inline]
@@ -265,22 +302,44 @@ impl Brain {
     #[inline]
     pub fn are_neurons_connected(&self, from: NeuronID, to: NeuronID) -> bool {
         self.synapses
-            .iter()
+            .par_iter()
             .any(|s| s.source == from && s.target == to)
     }
 
     #[inline]
     pub fn does_neuron_has_connections(&self, id: NeuronID) -> bool {
         self.synapses
-            .iter()
+            .par_iter()
             .any(|s| s.source == id || s.target == id)
     }
 
+    #[inline]
+    pub fn get_neuron_connections_count(&self, id: NeuronID) -> (usize, usize) {
+        let incoming = self.synapses.par_iter().filter(|s| s.target == id).count();
+        let outgoing = self.synapses.par_iter().filter(|s| s.source == id).count();
+        (incoming, outgoing)
+    }
+
+    #[inline]
+    pub fn get_neuron_connections(&self, id: NeuronID) -> (Vec<NeuronID>, Vec<NeuronID>) {
+        let incoming = self
+            .synapses
+            .par_iter()
+            .filter_map(|s| if s.target == id { Some(s.source) } else { None })
+            .collect();
+        let outgoing = self
+            .synapses
+            .par_iter()
+            .filter_map(|s| if s.source == id { Some(s.target) } else { None })
+            .collect();
+        (incoming, outgoing)
+    }
+
     pub fn create_sensor(&mut self, target: NeuronID) -> Result<SensorID> {
-        if let Some(sensor) = self.sensors.iter().find(|s| s.target == target) {
+        if let Some(sensor) = self.sensors.par_iter().find_any(|s| s.target == target) {
             return Err(Error::NeuronIsAlreadyConnectedToSensor(target, sensor.id));
         }
-        if let Some(effector) = self.effectors.iter().find(|e| e.source == target) {
+        if let Some(effector) = self.effectors.par_iter().find_any(|e| e.source == target) {
             return Err(Error::NeuronIsAlreadyConnectedToEffector(
                 target,
                 effector.id,
@@ -296,7 +355,7 @@ impl Brain {
     }
 
     pub fn kill_sensor(&mut self, id: SensorID) -> Result<()> {
-        if let Some(index) = self.sensors.iter().position(|s| s.id == id) {
+        if let Some(index) = self.sensors.par_iter().position_any(|s| s.id == id) {
             self.sensors.swap_remove(index);
             Ok(())
         } else {
@@ -305,8 +364,12 @@ impl Brain {
     }
 
     pub fn sensor_trigger_impulse(&mut self, id: SensorID, potential: Scalar) -> Result<()> {
-        if let Some(sensor) = self.sensors.iter().find(|s| s.id == id) {
-            if let Some(neuron) = self.neurons.iter_mut().find(|n| n.id() == sensor.target) {
+        if let Some(sensor) = self.sensors.par_iter().find_any(|s| s.id == id) {
+            if let Some(neuron) = self
+                .neurons
+                .par_iter_mut()
+                .find_any(|n| n.id() == sensor.target)
+            {
                 neuron.push_potential(potential);
                 Ok(())
             } else {
@@ -318,10 +381,10 @@ impl Brain {
     }
 
     pub fn create_effector(&mut self, source: NeuronID) -> Result<EffectorID> {
-        if let Some(sensor) = self.sensors.iter().find(|s| s.target == source) {
+        if let Some(sensor) = self.sensors.par_iter().find_any(|s| s.target == source) {
             return Err(Error::NeuronIsAlreadyConnectedToSensor(source, sensor.id));
         }
-        if let Some(effector) = self.effectors.iter().find(|e| e.source == source) {
+        if let Some(effector) = self.effectors.par_iter().find_any(|e| e.source == source) {
             return Err(Error::NeuronIsAlreadyConnectedToEffector(
                 source,
                 effector.id,
@@ -338,7 +401,7 @@ impl Brain {
     }
 
     pub fn kill_effector(&mut self, id: EffectorID) -> Result<()> {
-        if let Some(index) = self.effectors.iter().position(|e| e.id == id) {
+        if let Some(index) = self.effectors.par_iter().position_any(|e| e.id == id) {
             self.effectors.swap_remove(index);
             Ok(())
         } else {
@@ -347,7 +410,7 @@ impl Brain {
     }
 
     pub fn effector_potential_release(&mut self, id: EffectorID) -> Result<Scalar> {
-        if let Some(effector) = self.effectors.iter_mut().find(|e| e.id == id) {
+        if let Some(effector) = self.effectors.par_iter_mut().find_any(|e| e.id == id) {
             let potential = effector.potential;
             effector.potential = 0.0;
             Ok(potential)
@@ -364,7 +427,7 @@ impl Brain {
     }
 
     pub fn kill_neuron(&mut self, id: NeuronID) -> Result<()> {
-        if let Some(index) = self.neurons.iter().position(|n| n.id() == id) {
+        if let Some(index) = self.neurons.par_iter().position_any(|n| n.id() == id) {
             self.neurons.swap_remove(index);
             while let Some(index) = self
                 .synapses
@@ -373,10 +436,10 @@ impl Brain {
             {
                 self.synapses.swap_remove(index);
             }
-            while let Some(index) = self.sensors.iter().position(|s| s.target == id) {
+            while let Some(index) = self.sensors.par_iter().position_any(|s| s.target == id) {
                 self.sensors.swap_remove(index);
             }
-            while let Some(index) = self.effectors.iter().position(|e| e.source == id) {
+            while let Some(index) = self.effectors.par_iter().position_any(|e| e.source == id) {
                 self.effectors.swap_remove(index);
             }
             Ok(())
@@ -385,34 +448,35 @@ impl Brain {
         }
     }
 
-    pub fn bind_neurons(&mut self, from: NeuronID, to: NeuronID) -> Result<bool> {
+    pub fn bind_neurons(&mut self, from: NeuronID, to: NeuronID) -> Result<Option<Scalar>> {
         if from == to {
             return Err(Error::BindingNeuronToItSelf(from));
         }
         if let Some(source) = self.neuron(from) {
             if let Some(target) = self.neuron(to) {
                 if self.are_neurons_connected(from, to) {
-                    return Ok(false);
+                    return Ok(None);
                 }
-                if let Some(sensor) = self.sensors.iter().find(|s| s.target == to) {
+                if let Some(sensor) = self.sensors.par_iter().find_any(|s| s.target == to) {
                     return Err(Error::BindingNeuronToSensor(to, sensor.id));
                 }
-                if let Some(effector) = self.effectors.iter().find(|e| e.source == from) {
+                if let Some(effector) = self.effectors.par_iter().find_any(|e| e.source == from) {
                     return Err(Error::BindingEffectorToNeuron(effector.id, from));
                 }
                 let distance = source.position().distance(target.position());
+                let receptors = thread_rng().gen_range(
+                    self.config.default_receptors.0,
+                    self.config.default_receptors.1,
+                );
                 self.synapses.push(Synapse {
                     source: from,
                     target: to,
                     distance,
-                    receptors: thread_rng().gen_range(
-                        self.config.default_receptors.0,
-                        self.config.default_receptors.1,
-                    ),
+                    receptors,
                     impulses: vec![],
                     inactivity: 0.0,
                 });
-                Ok(true)
+                Ok(Some(receptors))
             } else {
                 Err(Error::NeuronDoesNotExists(to))
             }
@@ -425,12 +489,12 @@ impl Brain {
         if from == to {
             return Err(Error::UnbindingNeuronFromItSelf(from));
         }
-        if self.neurons.iter().any(|n| n.id() == from) {
-            if self.neurons.iter().any(|n| n.id() == to) {
+        if self.neurons.par_iter().any(|n| n.id() == from) {
+            if self.neurons.par_iter().any(|n| n.id() == to) {
                 if let Some(index) = self
                     .synapses
-                    .iter()
-                    .position(|s| s.source == from && s.target == to)
+                    .par_iter()
+                    .position_any(|s| s.source == from && s.target == to)
                 {
                     self.synapses.swap_remove(index);
                     Ok(true)
@@ -458,8 +522,8 @@ impl Brain {
             synapse_overdose_receptors,
             receptors_excitation,
             receptors_inhibition,
-            new_connections_delay,
             synapse_propagation_decay,
+            synapse_new_connection_receptors,
             ..
         } = self.config;
 
@@ -512,25 +576,6 @@ impl Brain {
                         });
                 }
             }
-            // self.synapses.par_iter_mut().for_each(|s| {
-            //     if s.inactivity <= 0.0 {
-            //         let sid = s.source;
-            //         if let Some((_, p)) = neurons_triggering.iter().find(|(id, _)| sid == *id) {
-            //             let under = if let Some(o) = synapse_overdose_receptors {
-            //                 s.receptors < o
-            //             } else {
-            //                 true
-            //             };
-            //             if under {
-            //                 s.impulses.push(Impulse {
-            //                     potential: *p,
-            //                     timeout: s.distance,
-            //                 });
-            //             }
-            //             s.inactivity = synapse_inactivity_time;
-            //         }
-            //     }
-            // });
         }
 
         // impulse propagation phase.
@@ -624,21 +669,7 @@ impl Brain {
                 self.synapses.swap_remove(index);
             }
             for (from, to) in neurons_to_reconnect {
-                self.bind_neurons(from, to)?;
-            }
-        }
-
-        // new connections phase.
-        if new_connections_delay > 0.0 {
-            self.new_connections_accum += delta_time;
-            while self.new_connections_accum > new_connections_delay {
-                let mut rng = thread_rng();
-                self.new_connections_accum -= new_connections_delay;
-                let neuron =
-                    &self.neurons[rng.gen_range(0, self.neurons.len()) % self.neurons.len()];
-                if let Some(id) = self.select_neuron(neuron.position(), &mut rng) {
-                    self.bind_neurons(neuron.id(), id)?;
-                }
+                drop(self.bind_neurons(from, to)?);
             }
         }
 
@@ -692,6 +723,36 @@ impl Brain {
             }
         }
 
+        // creating new connections phase.
+        if let Some(r) = synapse_new_connection_receptors {
+            let synapses_to_connect = self
+                .synapses
+                .par_iter()
+                .enumerate()
+                .filter_map(|(i, s)| {
+                    if s.receptors > r {
+                        if let Some(neuron) = self.neuron(s.source) {
+                            let mut rng = thread_rng();
+                            if let Some(id) = self.select_neuron(neuron.position(), &mut rng) {
+                                if s.source != id
+                                    && !self.are_neurons_connected(s.source, id)
+                                    && !self.are_neurons_connected(id, s.source)
+                                {
+                                    return Some((i, s.source, id));
+                                }
+                            }
+                        }
+                    }
+                    None
+                })
+                .collect::<Vec<_>>();
+            for (index, from, to) in synapses_to_connect.into_iter().rev() {
+                if let Some(receptors) = self.bind_neurons(from, to)? {
+                    self.synapses[index].receptors -= receptors;
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -709,7 +770,7 @@ impl Brain {
         }
         let filtered = self
             .neurons
-            .iter()
+            .par_iter()
             .filter_map(|neuron| {
                 if neuron.position().distance(position) < srr.unwrap() {
                     Some(neuron.id())
@@ -788,12 +849,119 @@ impl Brain {
         } else {
             vec![]
         };
+
         BrainActivityMap {
             connections,
             impulses,
             sensors,
             effectors,
             neurons,
+        }
+    }
+
+    pub fn build_activity_stats(&self) -> BrainActivityStats {
+        let neurons_potential = self.get_neurons_potential();
+        let neurons_potential_min = self
+            .neurons
+            .par_iter()
+            .map(|n| n.potential())
+            .min_by(|a, b| a.partial_cmp(&b).unwrap())
+            .unwrap_or(0.0);
+        let neurons_potential_max = self
+            .neurons
+            .par_iter()
+            .map(|n| n.potential())
+            .max_by(|a, b| a.partial_cmp(&b).unwrap())
+            .unwrap_or(0.0);
+        let impulses_potential = self.get_impulses_potential();
+        let impulses_potential_min = self
+            .synapses
+            .par_iter()
+            .map(|s| {
+                s.impulses
+                    .par_iter()
+                    .map(|i| i.potential)
+                    .min_by(|a, b| a.partial_cmp(&b).unwrap())
+                    .unwrap_or(0.0)
+            })
+            .min_by(|a, b| a.partial_cmp(&b).unwrap())
+            .unwrap_or(0.0);
+        let impulses_potential_max = self
+            .synapses
+            .par_iter()
+            .map(|s| {
+                s.impulses
+                    .par_iter()
+                    .map(|i| i.potential)
+                    .max_by(|a, b| a.partial_cmp(&b).unwrap())
+                    .unwrap_or(0.0)
+            })
+            .max_by(|a, b| a.partial_cmp(&b).unwrap())
+            .unwrap_or(0.0);
+        let neuron_connections = self
+            .neurons
+            .par_iter()
+            .map(|n| self.get_neuron_connections_count(n.id()))
+            .collect::<Vec<_>>();
+        let neuron_connections_min = neuron_connections
+            .par_iter()
+            .cloned()
+            .reduce(|| (0, 0), |a, b| (a.0.min(b.0), a.1.min(b.1)));
+        let neuron_connections_max = neuron_connections
+            .par_iter()
+            .cloned()
+            .reduce(|| (0, 0), |a, b| (a.0.max(b.0), a.1.max(b.1)));
+        let synapses_receptors_min = self
+            .synapses
+            .par_iter()
+            .map(|s| s.receptors)
+            .min_by(|a, b| a.partial_cmp(&b).unwrap())
+            .unwrap_or(0.0);
+        let synapses_receptors_max = self
+            .synapses
+            .par_iter()
+            .map(|s| s.receptors)
+            .max_by(|a, b| a.partial_cmp(&b).unwrap())
+            .unwrap_or(0.0);
+
+        BrainActivityStats {
+            neurons_count: self.neurons.len(),
+            synapses_count: self.synapses.len(),
+            impulses_count: self.get_impulses_count(),
+            neurons_potential: (
+                neurons_potential,
+                neurons_potential_min,
+                neurons_potential_max,
+            ),
+            impulses_potential: (
+                impulses_potential,
+                impulses_potential_min,
+                impulses_potential_max,
+            ),
+            all_potential: (
+                neurons_potential + impulses_potential,
+                neurons_potential_min.min(impulses_potential_min),
+                neurons_potential_max.max(impulses_potential_max),
+            ),
+            incoming_neuron_connections: (neuron_connections_min.0, neuron_connections_max.0),
+            outgoing_neuron_connections: (neuron_connections_min.1, neuron_connections_max.1),
+            synapses_receptors: (synapses_receptors_min, synapses_receptors_max),
+        }
+    }
+
+    pub fn ignite_random_synapses(&mut self, count: usize, potential: (Scalar, Scalar)) {
+        let mut rng = thread_rng();
+        for _ in 0..count {
+            let index = rng.gen_range(0, self.synapses.len()) % self.synapses.len();
+            let synapse = &mut self.synapses[index];
+            synapse.impulses.push(Impulse {
+                potential: if potential.1 <= potential.0 {
+                    potential.1
+                } else {
+                    rng.gen_range(potential.0, potential.1)
+                },
+                timeout: rng.gen_range(0.0, synapse.distance),
+            });
         }
     }
 }
