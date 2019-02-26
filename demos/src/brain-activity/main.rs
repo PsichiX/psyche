@@ -11,6 +11,7 @@ use psyche::core::brain_builder::BrainBuilder;
 use psyche::core::config::Config;
 use psyche::core::neuron::Position;
 use psyche::core::Scalar;
+use psyche::graphics::obj::generate;
 use rand::{thread_rng, Rng};
 use std::time::Instant;
 
@@ -19,15 +20,15 @@ fn make_brain() -> Brain {
     config.propagation_speed = 50.0;
     config.synapse_reconnection_range = Some(15.0);
     // config.synapse_overdose_receptors = Some(10.0);
-    // config.neuron_potential_decay = 0.1;
+    config.neuron_potential_decay = 0.1;
     config.synapse_propagation_decay = 0.01;
     config.synapse_new_connection_receptors = Some(2.0);
-    config.action_potential_treshold = 0.1;
+    // config.action_potential_treshold = 0.1;
 
     BrainBuilder::new()
         .config(config)
-        .neurons(3000)
-        .connections(5000)
+        .neurons(600)
+        .connections(1000)
         .min_neurogenesis_range(5.0)
         .max_neurogenesis_range(15.0)
         .radius(50.0)
@@ -77,7 +78,7 @@ fn main() {
     let mut hold_rot_y = 0.0;
     let mut rot_x = 0.0;
     let mut rot_y = 0.0;
-    let rot_speed = 90.0;
+    let rot_speed = 45.0;
     let mut rot = Quaternion::zero();
     let mut trigger_sensors = true;
     let trigger_sensors_delay = 0.1;
@@ -115,6 +116,16 @@ fn main() {
                         keyboard::Key::Y => {
                             if let ButtonState::Press = button.state {
                                 activity_stats = !activity_stats;
+                            }
+                        }
+                        keyboard::Key::P => {
+                            if let ButtonState::Press = button.state {
+                                if let Ok(bytes) = generate(
+                                    &brain.build_activity_map(activity::ALL),
+                                    &Default::default(),
+                                ) {
+                                    drop(::std::fs::write("./activity.obj", &bytes));
+                                }
                             }
                         }
                         keyboard::Key::W => match button.state {
