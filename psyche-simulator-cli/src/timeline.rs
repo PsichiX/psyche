@@ -33,6 +33,16 @@ impl Timeline {
         serde_yaml::from_str(yaml)
     }
 
+    #[inline]
+    pub fn to_json(&self) -> JsonResult<String> {
+        serde_json::to_string_pretty(self)
+    }
+
+    #[inline]
+    pub fn to_yaml(&self) -> YamlResult<String> {
+        serde_yaml::to_string(self)
+    }
+
     pub fn perform(&self, mut start: Scalar, mut end: Scalar) -> Option<Vec<Action>> {
         match self.playing_mode {
             PlayingMode::Infinite => {

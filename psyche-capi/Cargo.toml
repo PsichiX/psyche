@@ -1,6 +1,6 @@
 [package]
 name = "psyche-capi"
-version = "0.2.7"
+version = "0.2.8"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 edition = "2018"
 description = "C API module for Psyche AI Toolset"

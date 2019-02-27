@@ -1,13 +1,13 @@
 [package]
 name = "psyche-simulator-cli"
-version = "0.2.7"
+version = "0.2.8"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 edition = "2018"
 description = "CLI simulator for Psyche AI Toolset"
 license = "MIT"
 homepage = "https://github.com/PsichiX/psyche"
 repository = "https://github.com/PsichiX/psyche"
-documentation = "https://docs.rs/psyche"
+documentation = "https://docs.rs/psyche-simulator-cli"
 
 [[bin]]
 name = "psysim"
