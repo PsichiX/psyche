@@ -4,6 +4,10 @@ version = "0.2.7"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 edition = "2018"
 description = "CLI simulator for Psyche AI Toolset"
+license = "MIT"
+homepage = "https://github.com/PsichiX/psyche"
+repository = "https://github.com/PsichiX/psyche"
+documentation = "https://docs.rs/psyche"
 
 [[bin]]
 name = "psysim"
