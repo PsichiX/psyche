@@ -1,0 +1,18 @@
+[package]
+name = "psyche-simulator-cli"
+version = "0.2.7"
+authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
+edition = "2018"
+description = "CLI simulator for Psyche AI Toolset"
+
+[[bin]]
+name = "psysim"
+path = "src/main.rs"
+
+[dependencies]
+psyche = { version = "0.2", path = ".." }
+clap = "2.32"
+rand = "0.5"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.8"
