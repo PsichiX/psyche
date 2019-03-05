@@ -1,6 +1,6 @@
 [package]
 name = "demos"
-version = "0.2.8"
+version = "0.2.9"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 edition = "2018"
 
@@ -8,8 +8,18 @@ edition = "2018"
 name = "brain-activity"
 path = "src/brain-activity/main.rs"
 
+[[bin]]
+name = "spore"
+path = "src/spore/main.rs"
+
 [dependencies]
 piston_window = "0.89.0"
 psyche = { version = "0.2", path = ".." }
-cgmath = "0.17"
+cgmath = { version = "0.17", features = ["serde"] }
 rand = "0.5"
+serde = { version = "1.0", features = ["derive"] }
+bincode = "1.1"
+nalgebra = "0.17"
+ncollide2d = "0.18"
+nphysics2d = "0.10"
+clap = "2.32"

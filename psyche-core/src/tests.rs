@@ -38,7 +38,7 @@ fn test_brain() {
 
 #[test]
 fn test_brain_builder() {
-    let brain = BrainBuilder::new()
+    let _brain = BrainBuilder::new()
         .config(Config::default())
         .neurons(1000)
         .connections(1000)
@@ -79,7 +79,7 @@ fn test_offspring_builder() {
         .sensors(10)
         .effectors(10)
         .build();
-    let brain = OffspringBuilder::new()
+    let _brain = OffspringBuilder::new()
         .new_neurons(200)
         .new_connections(1000)
         .min_neurogenesis_range(0.1)

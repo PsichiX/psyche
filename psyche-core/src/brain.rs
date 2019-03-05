@@ -8,6 +8,7 @@ use crate::Scalar;
 use rand::{thread_rng, Rng};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::ops::Range;
 
 pub mod activity {
     pub const NONE: usize = 0;
@@ -36,24 +37,40 @@ pub struct BrainActivityMap {
     pub neurons: Vec<Position>,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 #[repr(C)]
 pub struct BrainActivityStats {
     pub neurons_count: usize,
     pub synapses_count: usize,
     pub impulses_count: usize,
-    // (current, min, max)
-    pub neurons_potential: (Scalar, Scalar, Scalar),
-    // (current, min, max)
-    pub impulses_potential: (Scalar, Scalar, Scalar),
-    // (current, min, max)
-    pub all_potential: (Scalar, Scalar, Scalar),
-    // (min, max)
-    pub incoming_neuron_connections: (usize, usize),
-    // (min, max)
-    pub outgoing_neuron_connections: (usize, usize),
-    // (min, max)
-    pub synapses_receptors: (Scalar, Scalar),
+    // (current, min..max)
+    pub neurons_potential: (Scalar, Range<Scalar>),
+    // (current, min..max)
+    pub impulses_potential: (Scalar, Range<Scalar>),
+    // (current, min..max)
+    pub all_potential: (Scalar, Range<Scalar>),
+    // min..max
+    pub incoming_neuron_connections: Range<usize>,
+    // min..max
+    pub outgoing_neuron_connections: Range<usize>,
+    // min..max
+    pub synapses_receptors: Range<Scalar>,
+}
+
+impl Default for BrainActivityStats {
+    fn default() -> Self {
+        Self {
+            neurons_count: 0,
+            synapses_count: 0,
+            impulses_count: 0,
+            neurons_potential: (0.0, 0.0..0.0),
+            impulses_potential: (0.0, 0.0..0.0),
+            all_potential: (0.0, 0.0..0.0),
+            incoming_neuron_connections: 0..0,
+            outgoing_neuron_connections: 0..0,
+            synapses_receptors: 0.0..0.0,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -465,8 +482,8 @@ impl Brain {
                 }
                 let distance = source.position().distance(target.position());
                 let receptors = thread_rng().gen_range(
-                    self.config.default_receptors.0,
-                    self.config.default_receptors.1,
+                    self.config.default_receptors.start,
+                    self.config.default_receptors.end,
                 );
                 self.synapses.push(Synapse {
                     source: from,
@@ -669,7 +686,7 @@ impl Brain {
                 self.synapses.swap_remove(index);
             }
             for (from, to) in neurons_to_reconnect {
-                drop(self.bind_neurons(from, to)?);
+                self.bind_neurons(from, to)?;
             }
         }
 
@@ -930,35 +947,33 @@ impl Brain {
             impulses_count: self.get_impulses_count(),
             neurons_potential: (
                 neurons_potential,
-                neurons_potential_min,
-                neurons_potential_max,
+                neurons_potential_min..neurons_potential_max,
             ),
             impulses_potential: (
                 impulses_potential,
-                impulses_potential_min,
-                impulses_potential_max,
+                impulses_potential_min..impulses_potential_max,
             ),
             all_potential: (
                 neurons_potential + impulses_potential,
-                neurons_potential_min.min(impulses_potential_min),
-                neurons_potential_max.max(impulses_potential_max),
+                neurons_potential_min.min(impulses_potential_min)
+                    ..neurons_potential_max.max(impulses_potential_max),
             ),
-            incoming_neuron_connections: (neuron_connections_min.0, neuron_connections_max.0),
-            outgoing_neuron_connections: (neuron_connections_min.1, neuron_connections_max.1),
-            synapses_receptors: (synapses_receptors_min, synapses_receptors_max),
+            incoming_neuron_connections: neuron_connections_min.0..neuron_connections_max.0,
+            outgoing_neuron_connections: neuron_connections_min.1..neuron_connections_max.1,
+            synapses_receptors: synapses_receptors_min..synapses_receptors_max,
         }
     }
 
-    pub fn ignite_random_synapses(&mut self, count: usize, potential: (Scalar, Scalar)) {
+    pub fn ignite_random_synapses(&mut self, count: usize, potential: Range<Scalar>) {
         let mut rng = thread_rng();
         for _ in 0..count {
             let index = rng.gen_range(0, self.synapses.len()) % self.synapses.len();
             let synapse = &mut self.synapses[index];
             synapse.impulses.push(Impulse {
-                potential: if potential.1 <= potential.0 {
-                    potential.1
+                potential: if potential.end <= potential.start {
+                    potential.end
                 } else {
-                    rng.gen_range(potential.0, potential.1)
+                    rng.gen_range(potential.start, potential.end)
                 },
                 timeout: rng.gen_range(0.0, synapse.distance),
             });

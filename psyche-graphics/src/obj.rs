@@ -89,9 +89,9 @@ pub fn generate(activity_map: &BrainActivityMap, config: &Config) -> Result<Vec<
                 tex_vertices: if config.color_storage == ColorStorage::TexVertices {
                     let Color(r, g, b) = neurons;
                     repeat(TVertex {
-                        u: *r as Scalar / 255.0,
-                        v: *g as Scalar / 255.0,
-                        w: *b as Scalar / 255.0,
+                        u: Scalar::from(*r) / 255.0,
+                        v: Scalar::from(*g) / 255.0,
+                        w: Scalar::from(*b) / 255.0,
                     })
                     .take(activity_map.neurons.len())
                     .collect()
@@ -101,9 +101,9 @@ pub fn generate(activity_map: &BrainActivityMap, config: &Config) -> Result<Vec<
                 normals: if config.color_storage == ColorStorage::Normals {
                     let Color(r, g, b) = neurons;
                     repeat(Vertex {
-                        x: *r as Scalar / 255.0,
-                        y: *g as Scalar / 255.0,
-                        z: *b as Scalar / 255.0,
+                        x: Scalar::from(*r) / 255.0,
+                        y: Scalar::from(*g) / 255.0,
+                        z: Scalar::from(*b) / 255.0,
                     })
                     .take(activity_map.neurons.len())
                     .collect()
@@ -152,9 +152,9 @@ pub fn generate(activity_map: &BrainActivityMap, config: &Config) -> Result<Vec<
                 tex_vertices: if config.color_storage == ColorStorage::TexVertices {
                     let Color(r, g, b) = synapses;
                     repeat(TVertex {
-                        u: *r as Scalar / 255.0,
-                        v: *g as Scalar / 255.0,
-                        w: *b as Scalar / 255.0,
+                        u: Scalar::from(*r) / 255.0,
+                        v: Scalar::from(*g) / 255.0,
+                        w: Scalar::from(*b) / 255.0,
                     })
                     .take(activity_map.connections.len())
                     .collect()
@@ -164,9 +164,9 @@ pub fn generate(activity_map: &BrainActivityMap, config: &Config) -> Result<Vec<
                 normals: if config.color_storage == ColorStorage::Normals {
                     let Color(r, g, b) = synapses;
                     repeat(Vertex {
-                        x: *r as Scalar / 255.0,
-                        y: *g as Scalar / 255.0,
-                        z: *b as Scalar / 255.0,
+                        x: Scalar::from(*r) / 255.0,
+                        y: Scalar::from(*g) / 255.0,
+                        z: Scalar::from(*b) / 255.0,
                     })
                     .take(activity_map.connections.len())
                     .collect()
@@ -213,9 +213,9 @@ pub fn generate(activity_map: &BrainActivityMap, config: &Config) -> Result<Vec<
                 tex_vertices: if config.color_storage == ColorStorage::TexVertices {
                     let Color(r, g, b) = impulses;
                     repeat(TVertex {
-                        u: *r as Scalar / 255.0,
-                        v: *g as Scalar / 255.0,
-                        w: *b as Scalar / 255.0,
+                        u: Scalar::from(*r) / 255.0,
+                        v: Scalar::from(*g) / 255.0,
+                        w: Scalar::from(*b) / 255.0,
                     })
                     .take(positions.len())
                     .collect()
@@ -225,9 +225,9 @@ pub fn generate(activity_map: &BrainActivityMap, config: &Config) -> Result<Vec<
                 normals: if config.color_storage == ColorStorage::Normals {
                     let Color(r, g, b) = impulses;
                     repeat(Vertex {
-                        x: *r as Scalar / 255.0,
-                        y: *g as Scalar / 255.0,
-                        z: *b as Scalar / 255.0,
+                        x: Scalar::from(*r) / 255.0,
+                        y: Scalar::from(*g) / 255.0,
+                        z: Scalar::from(*b) / 255.0,
                     })
                     .take(positions.len())
                     .collect()
@@ -266,9 +266,9 @@ pub fn generate(activity_map: &BrainActivityMap, config: &Config) -> Result<Vec<
                 tex_vertices: if config.color_storage == ColorStorage::TexVertices {
                     let Color(r, g, b) = sensors;
                     repeat(TVertex {
-                        u: *r as Scalar / 255.0,
-                        v: *g as Scalar / 255.0,
-                        w: *b as Scalar / 255.0,
+                        u: Scalar::from(*r) / 255.0,
+                        v: Scalar::from(*g) / 255.0,
+                        w: Scalar::from(*b) / 255.0,
                     })
                     .take(activity_map.sensors.len())
                     .collect()
@@ -278,9 +278,9 @@ pub fn generate(activity_map: &BrainActivityMap, config: &Config) -> Result<Vec<
                 normals: if config.color_storage == ColorStorage::Normals {
                     let Color(r, g, b) = sensors;
                     repeat(Vertex {
-                        x: *r as Scalar / 255.0,
-                        y: *g as Scalar / 255.0,
-                        z: *b as Scalar / 255.0,
+                        x: Scalar::from(*r) / 255.0,
+                        y: Scalar::from(*g) / 255.0,
+                        z: Scalar::from(*b) / 255.0,
                     })
                     .take(activity_map.sensors.len())
                     .collect()
@@ -320,9 +320,9 @@ pub fn generate(activity_map: &BrainActivityMap, config: &Config) -> Result<Vec<
                 tex_vertices: if config.color_storage == ColorStorage::TexVertices {
                     let Color(r, g, b) = effectors;
                     repeat(TVertex {
-                        u: *r as Scalar / 255.0,
-                        v: *g as Scalar / 255.0,
-                        w: *b as Scalar / 255.0,
+                        u: Scalar::from(*r) / 255.0,
+                        v: Scalar::from(*g) / 255.0,
+                        w: Scalar::from(*b) / 255.0,
                     })
                     .take(activity_map.effectors.len())
                     .collect()
@@ -332,9 +332,9 @@ pub fn generate(activity_map: &BrainActivityMap, config: &Config) -> Result<Vec<
                 normals: if config.color_storage == ColorStorage::Normals {
                     let Color(r, g, b) = effectors;
                     repeat(Vertex {
-                        x: *r as Scalar / 255.0,
-                        y: *g as Scalar / 255.0,
-                        z: *b as Scalar / 255.0,
+                        x: Scalar::from(*r) / 255.0,
+                        y: Scalar::from(*g) / 255.0,
+                        z: Scalar::from(*b) / 255.0,
                     })
                     .take(activity_map.effectors.len())
                     .collect()

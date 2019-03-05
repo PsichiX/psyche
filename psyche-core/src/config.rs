@@ -1,5 +1,6 @@
 use crate::Scalar;
 use serde::{Deserialize, Serialize};
+use std::ops::Range;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[repr(C)]
@@ -9,7 +10,7 @@ pub struct Config {
     pub action_potential_treshold: Scalar,
     pub receptors_excitation: Scalar,
     pub receptors_inhibition: Scalar,
-    pub default_receptors: (Scalar, Scalar),
+    pub default_receptors: Range<Scalar>,
     pub synapse_inactivity_time: Scalar,
     pub synapse_reconnection_range: Option<Scalar>,
     pub synapse_overdose_receptors: Option<Scalar>,
@@ -25,7 +26,7 @@ impl Default for Config {
             action_potential_treshold: 1.0,
             receptors_excitation: 1.0,
             receptors_inhibition: 0.05,
-            default_receptors: (0.5, 1.5),
+            default_receptors: 0.5..1.5,
             synapse_inactivity_time: 0.05,
             synapse_reconnection_range: None,
             synapse_overdose_receptors: None,
@@ -55,10 +56,10 @@ impl Config {
                 self.receptors_inhibition,
                 other.receptors_inhibition,
             ),
-            default_receptors: (
-                merge_scalar(self.default_receptors.0, other.default_receptors.0),
-                merge_scalar(self.default_receptors.1, other.default_receptors.1),
-            ),
+            default_receptors: Range {
+                start: merge_scalar(self.default_receptors.start, other.default_receptors.start),
+                end: merge_scalar(self.default_receptors.end, other.default_receptors.end),
+            },
             synapse_inactivity_time: merge_scalar(
                 self.synapse_inactivity_time,
                 other.synapse_inactivity_time,

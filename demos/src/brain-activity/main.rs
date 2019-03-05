@@ -51,6 +51,7 @@ fn make_brain() -> Brain {
     // brain
 }
 
+#[allow(clippy::cyclomatic_complexity)]
 fn main() {
     let mut window: PistonWindow =
         WindowSettings::new("Psyche - Brain Activity Visualizer", [600, 600])
@@ -208,7 +209,7 @@ fn main() {
                     z: Deg(0.0),
                 });
                 let transform = c.transform.trans(vx, vy).zoom(zoom);
-                let f = brain.config().default_receptors.1;
+                let f = brain.config().default_receptors.end;
                 for connection in &activity_map.connections {
                     line(
                         [0.0, 0.0, 1.0, (connection.2 / f) as f32 * 0.1],
@@ -296,22 +297,22 @@ fn print_stats(stats: BrainActivityStats) {
     println!("- impulses: {}", stats.impulses_count);
     println!("Potential:");
     println!("- neurons: {}", stats.neurons_potential.0);
-    println!("  - min: {}", stats.neurons_potential.1);
-    println!("  - max: {}", stats.neurons_potential.2);
+    println!("  - min: {}", stats.neurons_potential.1.start);
+    println!("  - max: {}", stats.neurons_potential.1.end);
     println!("- impulses: {}", stats.impulses_potential.0);
-    println!("  - min: {}", stats.impulses_potential.1);
-    println!("  - max: {}", stats.impulses_potential.2);
+    println!("  - min: {}", stats.impulses_potential.1.start);
+    println!("  - max: {}", stats.impulses_potential.1.end);
     println!("- all: {}", stats.all_potential.0);
-    println!("  - min: {}", stats.all_potential.1);
-    println!("  - max: {}", stats.all_potential.2);
+    println!("  - min: {}", stats.all_potential.1.start);
+    println!("  - max: {}", stats.all_potential.1.end);
     println!("Neurons connections:");
     println!("- Incoming:");
-    println!("  - min: {}", stats.incoming_neuron_connections.0);
-    println!("  - max: {}", stats.incoming_neuron_connections.1);
+    println!("  - min: {}", stats.incoming_neuron_connections.start);
+    println!("  - max: {}", stats.incoming_neuron_connections.end);
     println!("- Outgoing:");
-    println!("  - min: {}", stats.outgoing_neuron_connections.0);
-    println!("  - max: {}", stats.outgoing_neuron_connections.1);
+    println!("  - min: {}", stats.outgoing_neuron_connections.start);
+    println!("  - max: {}", stats.outgoing_neuron_connections.end);
     println!("Synapses receptors:");
-    println!("- min: {}", stats.synapses_receptors.0);
-    println!("- max: {}", stats.synapses_receptors.1);
+    println!("- min: {}", stats.synapses_receptors.start);
+    println!("- max: {}", stats.synapses_receptors.end);
 }
