@@ -11,6 +11,7 @@ mod managers;
 mod world;
 
 use crate::managers::items_manager::ItemsManager;
+use crate::managers::physics_manager::body::Vec2;
 use crate::managers::renderables_manager::renderable::Graphics;
 use crate::world::world_builder::WorldBuilder;
 use clap::{App, Arg};
@@ -21,10 +22,14 @@ use psyche::core::Scalar;
 use std::ops::Range;
 
 const WORLD_SIZE: [u32; 2] = [800, 600];
-const SPORES_COUNT: usize = 1;
-const SPORES_RADIUS: Range<Scalar> = 100.0..100.0;
-const FOOD_COUNT: usize = 10;
-const FOOD_CALORIES: Range<Scalar> = 100.0..1000.0;
+const RANDOMIZED_FLUID: Scalar = 10.0;
+const FLUID_DIFFUSE: Scalar = 0.1;
+const FLUID_DRAG: Scalar = 0.1;
+const FLUID_RESOLUTION: usize = 20;
+const SPORES_COUNT: usize = 2;
+const SPORES_RADIUS: Range<Scalar> = 15.0..30.0;
+const FOOD_COUNT: usize = 40;
+const FOOD_CALORIES: Range<Scalar> = 50.0..100.0;
 
 fn main() {
     let matches = App::new("Spores")
@@ -51,11 +56,9 @@ fn main() {
     let mut config = Config::default();
     config.propagation_speed = 50.0;
     config.synapse_reconnection_range = Some(15.0);
-    // config.synapse_overdose_receptors = Some(10.0);
     config.neuron_potential_decay = 0.1;
     config.synapse_propagation_decay = 0.01;
     config.synapse_new_connection_receptors = Some(2.0);
-    // config.action_potential_treshold = 0.1;
     let builder = BrainBuilder::new()
         .config(config)
         .neurons(100)
@@ -63,8 +66,8 @@ fn main() {
         .min_neurogenesis_range(5.0)
         .max_neurogenesis_range(15.0)
         .radius(30.0)
-        .sensors(0)
-        .effectors(8);
+        .sensors(10)
+        .effectors(10);
 
     if matches.is_present("headless") {
         main_headless(builder);
@@ -79,6 +82,13 @@ fn main_headless(builder: BrainBuilder) {
 
     let mut world = WorldBuilder::new()
         .size(size)
+        .grid_cols_rows((
+            WORLD_SIZE[0] as usize / FLUID_RESOLUTION,
+            WORLD_SIZE[1] as usize / FLUID_RESOLUTION,
+        ))
+        .randomized_fluid(RANDOMIZED_FLUID)
+        .fluid_diffuse(FLUID_DIFFUSE)
+        .fluid_drag(FLUID_DRAG)
         .spores_count(SPORES_COUNT)
         .spores_radius(SPORES_RADIUS)
         .spores_brain_builder(builder)
@@ -87,7 +97,7 @@ fn main_headless(builder: BrainBuilder) {
         .build();
 
     loop {
-        world.process(dt).unwrap();
+        world.process(dt);
     }
 }
 
@@ -97,14 +107,18 @@ fn main_visual(builder: BrainBuilder) {
         .build()
         .unwrap();
 
-    let size = (
-        window.size().width as Scalar,
-        window.size().height as Scalar,
-    );
+    let size = (window.size().width, window.size().height);
     window.set_max_fps(60);
     window.set_ups(20);
     let mut world = WorldBuilder::new()
         .size(size)
+        .grid_cols_rows((
+            size.0 as usize / FLUID_RESOLUTION,
+            size.1 as usize / FLUID_RESOLUTION,
+        ))
+        .randomized_fluid(RANDOMIZED_FLUID)
+        .fluid_diffuse(FLUID_DIFFUSE)
+        .fluid_drag(FLUID_DRAG)
         .spores_count(SPORES_COUNT)
         .spores_radius(SPORES_RADIUS)
         .spores_brain_builder(builder)
@@ -124,14 +138,49 @@ fn main_visual(builder: BrainBuilder) {
                 .set_root(Some(vec![water, food, spores].into()));
         });
 
+    let mut dragging = false;
+    let mut mouse_pos = (0.0, 0.0);
+    let mut last_mouse_pos = mouse_pos;
     while let Some(e) = window.next() {
-        if let Event::Input(_input) = &e {
-            // TODO
+        if let Event::Input(input) = &e {
+            match input {
+                Input::Button(button) => {
+                    if let Button::Mouse(mouse) = button.button {
+                        if let mouse::MouseButton::Left = mouse {
+                            match button.state {
+                                ButtonState::Press => {
+                                    dragging = true;
+                                }
+                                ButtonState::Release => {
+                                    dragging = false;
+                                }
+                            }
+                        }
+                    }
+                }
+                Input::Move(motion) => {
+                    if let Motion::MouseCursor(x, y) = motion {
+                        mouse_pos = (*x, *y);
+                    }
+                }
+                _ => {}
+            }
         }
 
         if let Some(args) = e.update_args() {
             let dt = args.dt;
-            world.process(dt).unwrap();
+            world.process(dt);
+
+            if dragging {
+                world.physics_mut().apply_fluid_force(
+                    Vec2::new(mouse_pos.0, mouse_pos.1),
+                    Vec2::new(
+                        mouse_pos.0 - last_mouse_pos.0,
+                        mouse_pos.1 - last_mouse_pos.1,
+                    ) * 5.0,
+                );
+            }
+            last_mouse_pos = mouse_pos;
         }
 
         if e.render_args().is_some() {

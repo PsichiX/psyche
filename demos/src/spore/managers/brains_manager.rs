@@ -1,7 +1,6 @@
 use crate::managers::items_manager::ItemsManager;
 use crate::managers::items_manager::Named;
 use psyche::core::brain::{Brain, BrainID};
-use psyche::core::error::*;
 use psyche::core::Scalar;
 
 impl Named<Self> for Brain {
@@ -21,11 +20,10 @@ impl BrainsManager {
         Self::default()
     }
 
-    pub fn process(&mut self, dt: Scalar) -> Result<()> {
+    pub fn process(&mut self, dt: Scalar) {
         for brain in &mut self.brains {
-            brain.process(dt)?;
+            brain.process(dt).unwrap();
         }
-        Ok(())
     }
 }
 

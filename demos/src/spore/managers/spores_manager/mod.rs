@@ -68,7 +68,7 @@ impl SporesManager {
                         }
                     }
                 }
-                for state in inner.renderables_legs.values() {
+                for state in inner.legs.values() {
                     if let Some(renderable) = renderables.item_mut(state.renderable) {
                         let factor = match state.phase {
                             1 => 1.0,
@@ -90,7 +90,7 @@ impl SporesManager {
         renderables: &mut RenderablesManager,
     ) {
         for spore in &mut self.spores {
-            spore.process(brains);
+            spore.process(brains, physics);
         }
 
         let food_to_destroy = physics

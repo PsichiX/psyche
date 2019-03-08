@@ -11,7 +11,6 @@ use crate::managers::renderables_manager::RenderablesManager;
 use crate::managers::spores_manager::spore::{Spore, SporeID};
 use crate::managers::spores_manager::SporesManager;
 use psyche::core::brain_builder::BrainBuilder;
-use psyche::core::error::*;
 use psyche::core::Scalar;
 use rand::{thread_rng, Rng};
 use std::f64::consts::PI;
@@ -28,12 +27,24 @@ pub struct World {
 }
 
 impl World {
-    pub fn new(size: (Scalar, Scalar)) -> Self {
+    pub fn new(
+        size: (Scalar, Scalar),
+        grid_cols_rows: (usize, usize),
+        randomized_fluid: Scalar,
+        fluid_diffuse: Scalar,
+        fluid_drag: Scalar,
+    ) -> Self {
         Self {
             size,
             renderables: RenderablesManager::new(),
             spores: SporesManager::new(),
-            physics: PhysicsManager::new(Some(size)),
+            physics: PhysicsManager::new(
+                size,
+                grid_cols_rows,
+                randomized_fluid,
+                fluid_diffuse,
+                fluid_drag,
+            ),
             brains: BrainsManager::new(),
             food: FoodManager::new(),
         }
@@ -83,21 +94,20 @@ impl World {
         &mut self.food
     }
 
-    pub fn process(&mut self, dt: Scalar) -> Result<()> {
+    pub fn process(&mut self, dt: Scalar) {
         self.physics.process(dt);
-        self.brains.process(dt)?;
+        self.brains.process(dt);
         self.spores.process(
             &mut self.brains,
             &mut self.physics,
             &mut self.food,
             &mut self.renderables,
         );
+        self.food.process(&mut self.physics);
 
         self.spores
             .refresh(&self.physics, &mut self.renderables, &self.brains);
         self.food.refresh(&self.physics, &mut self.renderables);
-
-        Ok(())
     }
 
     pub fn born_spore(&mut self, builder: &BrainBuilder, radius: Range<Scalar>) -> SporeID {

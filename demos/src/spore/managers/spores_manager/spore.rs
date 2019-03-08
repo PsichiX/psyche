@@ -1,6 +1,6 @@
 use crate::managers::brains_manager::BrainsManager;
 use crate::managers::items_manager::{ItemsManager, Named};
-use crate::managers::physics_manager::body::BodyID;
+use crate::managers::physics_manager::body::{BodyID, Vec2};
 use crate::managers::physics_manager::PhysicsManager;
 use crate::managers::renderables_manager::renderable::{angle, Graphics, RenderableID};
 use crate::managers::renderables_manager::RenderablesManager;
@@ -8,6 +8,7 @@ use psyche::core::brain::BrainID;
 use psyche::core::brain_builder::BrainBuilder;
 use psyche::core::effector::EffectorID;
 use psyche::core::id::ID;
+use psyche::core::sensor::SensorID;
 use psyche::core::Scalar;
 use std::collections::HashMap;
 use std::f64::consts::PI;
@@ -22,10 +23,17 @@ pub struct LegState {
 }
 
 #[derive(Debug, Clone, Default)]
+pub struct DetectorState {
+    pub renderable: RenderableID,
+    pub angle: Scalar,
+}
+
+#[derive(Debug, Clone, Default)]
 pub struct SporeInner {
     pub body: BodyID,
     pub renderable_body: RenderableID,
-    pub renderables_legs: HashMap<EffectorID, LegState>,
+    pub legs: HashMap<EffectorID, LegState>,
+    pub detectors: HashMap<SensorID, DetectorState>,
     pub brain: BrainID,
 }
 
@@ -81,39 +89,69 @@ impl Spore {
         });
         let mut brain = brain_builder.clone().radius(radius).build();
         brain.ignite_random_synapses(brain.synapses_count(), 10.0..10.0);
-        let effectors = brain.get_effectors();
-        let count = effectors.len();
-        let renderables_legs = effectors
-            .into_iter()
-            .enumerate()
-            .map(|(i, id)| {
-                let rot = PI * 2.0 * (i as Scalar) / (count as Scalar);
-                let pos = [rot.cos() * radius, rot.sin() * radius];
-                let renderable = renderables.create_with(|renderable, _| {
-                    renderable.transform.position = pos.into();
-                    renderable.transform.angle = angle(rot);
-                    renderable.graphics =
-                        Graphics::Line([0.5, 1.0, 0.5, 0.25], radius * 0.3, radius * 0.05);
-                });
-                (
-                    id,
-                    LegState {
-                        renderable,
-                        angle: rot,
-                        phase: 0,
-                    },
-                )
-            })
-            .collect::<HashMap<_, _>>();
+        let legs = {
+            let effectors = brain.get_effectors();
+            let count = effectors.len();
+            effectors
+                .into_iter()
+                .enumerate()
+                .map(|(i, id)| {
+                    let rot = PI * 2.0 * (i as Scalar) / (count as Scalar);
+                    let pos = [rot.cos() * radius, rot.sin() * radius];
+                    let renderable = renderables.create_with(|renderable, _| {
+                        renderable.transform.position = pos.into();
+                        renderable.transform.angle = angle(rot);
+                        renderable.graphics =
+                            Graphics::Line([0.5, 1.0, 0.5, 0.25], radius * 0.3, radius * 0.05);
+                    });
+                    (
+                        id,
+                        LegState {
+                            renderable,
+                            angle: rot,
+                            phase: 0,
+                        },
+                    )
+                })
+                .collect::<HashMap<_, _>>()
+        };
+        let detectors = {
+            let sensors = brain.get_sensors();
+            let count = sensors.len();
+            sensors
+                .into_iter()
+                .enumerate()
+                .map(|(i, id)| {
+                    let rot = PI * (1.0 + 2.0 * (i as Scalar) / (count as Scalar));
+                    let pos = [rot.cos() * radius, rot.sin() * radius];
+                    let renderable = renderables.create_with(|renderable, _| {
+                        renderable.transform.position = pos.into();
+                        renderable.transform.angle = angle(rot);
+                        renderable.graphics = Graphics::Rectangle(
+                            [1.0, 1.0, 0.0, 0.25],
+                            [radius * 0.1, radius * 0.1].into(),
+                        );
+                    });
+                    (
+                        id,
+                        DetectorState {
+                            renderable,
+                            angle: rot,
+                        },
+                    )
+                })
+                .collect::<HashMap<_, _>>()
+        };
         let renderable_body = renderables.create_with(|renderable, _| {
             renderable.transform.position = position.into();
             renderable.transform.angle = angle(rotation);
             renderable.graphics = Graphics::Circle([1.0, 0.5, 0.5, 0.25], radius);
         });
         if let Some(spores) = renderables.hierarchy_mut("spores") {
-            let children = renderables_legs
+            let children = legs
                 .iter()
                 .map(|(_, state)| state.renderable.into())
+                .chain(detectors.iter().map(|(_, state)| state.renderable.into()))
                 .collect::<Vec<_>>();
             spores.children.push((renderable_body, children).into());
         }
@@ -122,7 +160,8 @@ impl Spore {
         let inner = SporeInner {
             body,
             renderable_body,
-            renderables_legs,
+            legs,
+            detectors,
             brain,
         };
         self.inner = Some(inner);
@@ -136,7 +175,7 @@ impl Spore {
     ) {
         if let Some(ref inner) = self.inner {
             physics.destroy(inner.body);
-            for state in inner.renderables_legs.values() {
+            for state in inner.legs.values() {
                 renderables.destroy(state.renderable);
             }
             renderables.destroy(inner.renderable_body);
@@ -145,13 +184,19 @@ impl Spore {
         }
     }
 
-    pub fn process(&mut self, brains: &mut BrainsManager) {
+    pub fn process(&mut self, brains: &mut BrainsManager, physics: &mut PhysicsManager) {
         if let Some(ref mut inner) = self.inner {
             if let Some(brain) = brains.item_mut(inner.brain) {
-                for (effector, state) in &mut inner.renderables_legs {
-                    if let Ok(potential) = brain.effector_potential_release(*effector) {
-                        if potential > 0.1 {
-                            state.phase = (state.phase + 1) % 4;
+                if let Some(body) = physics.item(inner.body) {
+                    let (pos, rot, _) = body.state(physics).unwrap();
+                    for (effector, state) in &mut inner.legs {
+                        if let Ok(potential) = brain.effector_potential_release(*effector) {
+                            if potential > 0.1 {
+                                state.phase = (state.phase + 1) % 4;
+                                let r = rot + state.angle;
+                                let f = Vec2::new(r.cos(), r.sin()) * -2.5;
+                                physics.apply_fluid_force(pos, f);
+                            }
                         }
                     }
                 }

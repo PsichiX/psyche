@@ -1,6 +1,6 @@
 [package]
 name = "psyche"
-version = "0.2.9"
+version = "0.2.10"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 edition = "2018"
 description = "Psyche AI Toolset"
@@ -11,6 +11,7 @@ documentation = "https://docs.rs/psyche"
 
 [dependencies]
 psyche-core = { version = "0.2", path = "./psyche-core" }
+psyche-utils = { version = "0.2", path = "./psyche-utils" }
 psyche-serde = { version = "0.2", path = "./psyche-serde" }
 psyche-host = { version = "0.2", path = "./psyche-host" }
 psyche-graphics = { version = "0.2", path = "./psyche-graphics" }
@@ -23,6 +24,7 @@ members = [
   "psyche-graphics",
   "psyche-capi",
   "psyche-simulator-cli",
+  "psyche-utils",
 ]
 exclude = [
   "demos",

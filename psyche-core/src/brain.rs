@@ -778,22 +778,19 @@ impl Brain {
         R: Rng,
     {
         let srr = self.config.synapse_reconnection_range;
-        if srr.is_none() {
-            return if self.neurons.is_empty() {
-                None
-            } else {
-                Some(self.neurons[rng.gen_range(0, self.neurons.len()) % self.neurons.len()].id())
-            };
-        }
         let filtered = self
             .neurons
             .par_iter()
             .filter_map(|neuron| {
-                if neuron.position().distance(position) < srr.unwrap() {
-                    Some(neuron.id())
-                } else {
-                    None
+                if self.sensors.par_iter().any(|s| s.target == neuron.id()) {
+                    return None;
                 }
+                if let Some(srr) = srr {
+                    if neuron.position().distance(position) < srr {
+                        return None;
+                    }
+                }
+                Some(neuron.id())
             })
             .collect::<Vec<_>>();
         if filtered.is_empty() {

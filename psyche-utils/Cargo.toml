@@ -1,13 +1,12 @@
 [package]
-name = "psyche-host"
+name = "psyche-utils"
 version = "0.2.10"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 edition = "2018"
-description = "Host module for Psyche AI Toolset"
+description = "Utils module for Psyche AI Toolset"
 license = "MIT"
 homepage = "https://github.com/PsichiX/psyche"
 repository = "https://github.com/PsichiX/psyche"
-documentation = "https://docs.rs/psyche-host"
+documentation = "https://docs.rs/psyche-utils"
 
 [dependencies]
-psyche-core = { version = "0.2", path = "../psyche-core" }
