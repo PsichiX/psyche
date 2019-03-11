@@ -1,4 +1,5 @@
 use crate::managers::brains_manager::BrainsManager;
+use crate::managers::food_manager::FoodManager;
 use crate::managers::items_manager::{ItemsManager, Named};
 use crate::managers::physics_manager::body::{BodyID, Vec2};
 use crate::managers::physics_manager::PhysicsManager;
@@ -26,6 +27,7 @@ pub struct LegState {
 pub struct DetectorState {
     pub renderable: RenderableID,
     pub angle: Scalar,
+    pub potential: Scalar,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -85,10 +87,10 @@ impl Spore {
 
         let (position, rotation, radius) = position_rotation_radius;
         let body = physics.create_with(|body, owner| {
-            body.setup(owner, Some(position.into()), Some(rotation), Some(radius));
+            owner.setup(body, Some(position.into()), Some(rotation));
+            body.set_radius(radius);
         });
-        let mut brain = brain_builder.clone().radius(radius).build();
-        brain.ignite_random_synapses(brain.synapses_count(), 10.0..10.0);
+        let brain = brain_builder.clone().radius(radius).build();
         let legs = {
             let effectors = brain.get_effectors();
             let count = effectors.len();
@@ -137,6 +139,7 @@ impl Spore {
                         DetectorState {
                             renderable,
                             angle: rot,
+                            potential: 0.0,
                         },
                     )
                 })
@@ -184,18 +187,42 @@ impl Spore {
         }
     }
 
-    pub fn process(&mut self, brains: &mut BrainsManager, physics: &mut PhysicsManager) {
+    pub fn process(
+        &mut self,
+        brains: &mut BrainsManager,
+        physics: &mut PhysicsManager,
+        food: &FoodManager,
+    ) {
         if let Some(ref mut inner) = self.inner {
             if let Some(brain) = brains.item_mut(inner.brain) {
                 if let Some(body) = physics.item(inner.body) {
-                    let (pos, rot, _) = body.state(physics).unwrap();
-                    for (effector, state) in &mut inner.legs {
+                    let (position, rotation, radius) = {
+                        let state = body.cached_state();
+                        (state.position, state.rotation, state.radius)
+                    };
+                    if !inner.detectors.is_empty() {
+                        let fov = PI / inner.detectors.len() as Scalar;
+                        for (sensor, detector_state) in &mut inner.detectors {
+                            let r = rotation + detector_state.angle;
+                            let direction = Vec2::new(r.cos(), r.sin());
+                            let potential = physics.sample_field_of_view(
+                                position,
+                                direction,
+                                fov,
+                                None,
+                                |spatial| food.item_by_body(spatial.body).is_some(),
+                            );
+                            drop(brain.sensor_trigger_impulse(*sensor, potential));
+                            detector_state.potential = potential;
+                        }
+                    }
+                    for (effector, leg_state) in &mut inner.legs {
                         if let Ok(potential) = brain.effector_potential_release(*effector) {
                             if potential > 0.1 {
-                                state.phase = (state.phase + 1) % 4;
-                                let r = rot + state.angle;
-                                let f = Vec2::new(r.cos(), r.sin()) * -2.5;
-                                physics.apply_fluid_force(pos, f);
+                                leg_state.phase = (leg_state.phase + 1) % 4;
+                                let r = rotation + leg_state.angle;
+                                let f = Vec2::new(r.cos(), r.sin()) * radius * -0.1;
+                                physics.apply_fluid_force(position, f);
                             }
                         }
                     }

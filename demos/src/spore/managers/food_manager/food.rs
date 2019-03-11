@@ -64,7 +64,8 @@ impl Food {
 
         let radius = (calories / PI).sqrt();
         let body = Body::new(physics, true);
-        body.setup(physics, Some(position.into()), Some(0.0), Some(radius));
+        physics.setup(&body, Some(position.into()), Some(0.0));
+        body.set_radius(radius);
         let body = physics.add(body);
         let renderable = renderables.create_with(|renderable, _| {
             renderable.transform.position = position.into();

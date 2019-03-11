@@ -31,18 +31,11 @@ impl FoodManager {
     pub fn refresh(&self, physics: &PhysicsManager, renderables: &mut RenderablesManager) {
         for food in &self.food {
             if let Some(inner) = food.inner() {
-                let renderable = if let Some(renderable) = renderables.item_mut(inner.renderable) {
-                    renderable
-                } else {
-                    continue;
-                };
-                let body = if let Some(body) = physics.item(inner.body) {
-                    body
-                } else {
-                    continue;
-                };
-                if let Some(position) = body.position(physics) {
-                    renderable.transform.position = [position.x, position.y].into();
+                if let Some(renderable) = renderables.item_mut(inner.renderable) {
+                    if let Some(body) = physics.item(inner.body) {
+                        let position = body.cached_state().position;
+                        renderable.transform.position = [position.x, position.y].into();
+                    }
                 }
             }
         }
@@ -53,12 +46,9 @@ impl FoodManager {
         for food in &self.food {
             if let Some(inner) = food.inner() {
                 physics.with(inner.body, |body, owner| {
-                    let (mut position, radius) =
-                        if let Some((position, _, radius)) = body.state(owner) {
-                            (position, radius)
-                        } else {
-                            return;
-                        };
+                    let state = body.cached_state();
+                    let mut position = state.position;
+                    let radius = state.radius;
                     let radius2 = radius * 2.0;
                     let mut apply = false;
                     if position.x < -radius2 {
@@ -76,7 +66,7 @@ impl FoodManager {
                         apply = true;
                     }
                     if apply {
-                        body.set_position(owner, position);
+                        owner.set_body_position(body, position);
                     }
                 });
             }

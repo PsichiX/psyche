@@ -41,32 +41,29 @@ impl SporesManager {
     ) {
         for spore in &self.spores {
             if let Some(inner) = spore.inner() {
-                {
-                    let renderable =
-                        if let Some(renderable) = renderables.item_mut(inner.renderable_body) {
-                            renderable
-                        } else {
-                            continue;
-                        };
-                    let body = if let Some(body) = physics.item(inner.body) {
-                        body
+                let renderable =
+                    if let Some(renderable) = renderables.item_mut(inner.renderable_body) {
+                        renderable
                     } else {
                         continue;
                     };
-                    let brain = if let Some(brain) = brains.item(inner.brain) {
-                        brain
-                    } else {
-                        continue;
-                    };
-                    if let Some((position, rotation, radius)) = body.state(physics) {
-                        renderable.transform.position = [position.x, position.y].into();
-                        renderable.transform.angle = angle(rotation);
-                        if let Graphics::Circle(ref mut color, ref mut r) = renderable.graphics {
-                            let f = (brain.get_potential() as f32 * 0.1).max(0.0).min(1.0);
-                            *color = [f, f * 0.5, f * 0.5, 0.25];
-                            *r = radius;
-                        }
-                    }
+                let body = if let Some(body) = physics.item(inner.body) {
+                    body
+                } else {
+                    continue;
+                };
+                let brain = if let Some(brain) = brains.item(inner.brain) {
+                    brain
+                } else {
+                    continue;
+                };
+                let state = body.cached_state();
+                renderable.transform.position = [state.position.x, state.position.y].into();
+                renderable.transform.angle = angle(state.rotation);
+                if let Graphics::Circle(ref mut color, ref mut r) = renderable.graphics {
+                    let f = (brain.get_potential() as f32 * 0.1).max(0.0).min(1.0);
+                    *color = [f, f * 0.5, f * 0.5, 0.25];
+                    *r = state.radius;
                 }
                 for state in inner.legs.values() {
                     if let Some(renderable) = renderables.item_mut(state.renderable) {
@@ -76,6 +73,14 @@ impl SporesManager {
                             _ => 0.0,
                         };
                         renderable.transform.angle = angle(state.angle + PI * 0.2 * factor);
+                    }
+                }
+                for state in inner.detectors.values() {
+                    if let Some(renderable) = renderables.item_mut(state.renderable) {
+                        if let Graphics::Rectangle(ref mut color, _) = renderable.graphics {
+                            let f = (state.potential as f32 * 1.0).max(0.0).min(1.0);
+                            *color = [f, f, 0.0, 0.25];
+                        }
                     }
                 }
             }
@@ -90,7 +95,7 @@ impl SporesManager {
         renderables: &mut RenderablesManager,
     ) {
         for spore in &mut self.spores {
-            spore.process(brains, physics);
+            spore.process(brains, physics, foods);
         }
 
         let food_to_destroy = physics
@@ -115,7 +120,7 @@ impl SporesManager {
             foods.destroy(id);
         }
 
-        // TODO: eat smaller spore.
+        // TODO: produce offspring if compatible DNA or eat smaller spore.
         // for contact in physics.cache_bodies_contacted() {}
     }
 }

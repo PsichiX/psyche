@@ -6,6 +6,7 @@ extern crate nphysics2d;
 extern crate piston_window;
 extern crate psyche;
 extern crate rand;
+extern crate spade;
 
 mod managers;
 mod world;
@@ -22,12 +23,12 @@ use psyche::core::Scalar;
 use std::ops::Range;
 
 const WORLD_SIZE: [u32; 2] = [800, 600];
-const RANDOMIZED_FLUID: Scalar = 10.0;
+const RANDOMIZED_FLUID: Scalar = 5.0;
 const FLUID_DIFFUSE: Scalar = 0.1;
 const FLUID_DRAG: Scalar = 0.1;
 const FLUID_RESOLUTION: usize = 20;
-const SPORES_COUNT: usize = 2;
-const SPORES_RADIUS: Range<Scalar> = 15.0..30.0;
+const SPORES_COUNT: usize = 10;
+const SPORES_RADIUS: Range<Scalar> = 10.0..20.0;
 const FOOD_COUNT: usize = 40;
 const FOOD_CALORIES: Range<Scalar> = 50.0..100.0;
 
@@ -141,11 +142,20 @@ fn main_visual(builder: BrainBuilder) {
     let mut dragging = false;
     let mut mouse_pos = (0.0, 0.0);
     let mut last_mouse_pos = mouse_pos;
+    let mut running = true;
     while let Some(e) = window.next() {
         if let Event::Input(input) = &e {
             match input {
-                Input::Button(button) => {
-                    if let Button::Mouse(mouse) = button.button {
+                Input::Button(button) => match button.button {
+                    Button::Keyboard(key) => match key {
+                        keyboard::Key::Space => {
+                            if let ButtonState::Press = button.state {
+                                running = !running;
+                            }
+                        }
+                        _ => {}
+                    },
+                    Button::Mouse(mouse) => {
                         if let mouse::MouseButton::Left = mouse {
                             match button.state {
                                 ButtonState::Press => {
@@ -157,7 +167,8 @@ fn main_visual(builder: BrainBuilder) {
                             }
                         }
                     }
-                }
+                    _ => {}
+                },
                 Input::Move(motion) => {
                     if let Motion::MouseCursor(x, y) = motion {
                         mouse_pos = (*x, *y);
@@ -168,19 +179,20 @@ fn main_visual(builder: BrainBuilder) {
         }
 
         if let Some(args) = e.update_args() {
-            let dt = args.dt;
-            world.process(dt);
-
-            if dragging {
-                world.physics_mut().apply_fluid_force(
-                    Vec2::new(mouse_pos.0, mouse_pos.1),
-                    Vec2::new(
-                        mouse_pos.0 - last_mouse_pos.0,
-                        mouse_pos.1 - last_mouse_pos.1,
-                    ) * 5.0,
-                );
+            if running {
+                let dt = args.dt;
+                world.process(dt);
+                if dragging {
+                    world.physics_mut().apply_fluid_force(
+                        Vec2::new(mouse_pos.0, mouse_pos.1),
+                        Vec2::new(
+                            mouse_pos.0 - last_mouse_pos.0,
+                            mouse_pos.1 - last_mouse_pos.1,
+                        ) * 5.0,
+                    );
+                }
+                last_mouse_pos = mouse_pos;
             }
-            last_mouse_pos = mouse_pos;
         }
 
         if e.render_args().is_some() {

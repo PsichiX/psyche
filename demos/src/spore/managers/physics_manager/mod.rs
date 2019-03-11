@@ -1,12 +1,15 @@
 #![allow(dead_code)]
 
 pub mod body;
+pub mod spatial;
 
 use crate::managers::items_manager::{ItemsManager, Named};
 use body::*;
+use nalgebra::UnitComplex;
 use ncollide2d::events::ContactEvent;
-use ncollide2d::query::Proximity;
-use ncollide2d::shape::{Cuboid, ShapeHandle};
+use ncollide2d::query::{Proximity, Ray};
+use ncollide2d::shape::{Ball, Cuboid, ShapeHandle};
+use ncollide2d::world::CollisionGroups;
 use nphysics2d::algebra::{Force2, ForceType};
 use nphysics2d::object::{Body as PhysicsBody, BodyStatus, ColliderDesc, RigidBodyDesc};
 use nphysics2d::world::World as PhysicsWorld;
@@ -14,6 +17,8 @@ use psyche::core::Scalar;
 use psyche::utils::grid::{Grid, GridSampleZeroValue, GridSamplerCluster, GridSamplerDistance};
 use psyche::utils::switch::Switch;
 use rand::{thread_rng, Rng};
+use spade::rtree::RTree;
+use spatial::*;
 use std::fmt;
 use std::ops::{Add, AddAssign, Div, Mul};
 
@@ -39,6 +44,7 @@ pub struct PhysicsManager {
     fluid_diffuse: Scalar,
     fluid_drag: Scalar,
     cache_fluid_forces: Vec<(Vec2, Vec2)>,
+    cached_spatial_data: RTree<SpatialData>,
 }
 
 impl PhysicsManager {
@@ -109,6 +115,7 @@ impl PhysicsManager {
             fluid_diffuse,
             fluid_drag,
             cache_fluid_forces: vec![],
+            cached_spatial_data: RTree::new(),
         }
     }
 
@@ -142,12 +149,198 @@ impl PhysicsManager {
         self.cache_fluid_forces.push((position, force));
     }
 
+    pub fn set_body_position(&mut self, body: &Body, value: Vec2) {
+        if let Some(body) = self.world.rigid_body_mut(body.body_handle()) {
+            let mut pos = *body.position();
+            pos.translation.vector = value;
+            body.set_position(pos);
+        }
+    }
+
+    pub fn set_body_rotation(&mut self, body: &Body, value: Scalar) {
+        if let Some(body) = self.world.rigid_body_mut(body.body_handle()) {
+            let mut pos = *body.position();
+            pos.rotation = UnitComplex::new(value);
+            body.set_position(pos);
+        }
+    }
+
+    pub fn setup(&mut self, body: &Body, position: Option<Vec2>, rotation: Option<Scalar>) {
+        if position.is_some() || rotation.is_some() {
+            if let Some(body) = self.world.rigid_body_mut(body.body_handle()) {
+                let mut pos = *body.position();
+                if let Some(position) = position {
+                    pos.translation.vector = position;
+                }
+                if let Some(rotation) = rotation {
+                    pos.rotation = UnitComplex::new(rotation);
+                }
+                body.set_position(pos);
+            }
+        }
+    }
+
+    pub fn sample_field_of_view_bodies<F, T>(
+        &self,
+        position: Vec2,
+        mut direction: Vec2,
+        mut angle: Scalar,
+        range: Option<Scalar>,
+        mut filter: F,
+    ) -> Vec<(BodyID, T)>
+    where
+        F: FnMut(&SpatialData) -> Option<T>,
+    {
+        direction = direction.normalize();
+        angle = angle.cos();
+        self.cached_spatial_data
+            .nearest_neighbor_iterator(&[position.x, position.y])
+            .filter_map(|spatial| {
+                let spos: Vec2 = spatial.position.into();
+                let delta = spos - position;
+                if let Some(range) = range {
+                    if delta.magnitude() <= range {
+                        let sdir = delta.normalize();
+                        if direction.dot(&sdir) >= angle {
+                            if let Some(data) = filter(spatial) {
+                                return Some((spatial.body, data));
+                            }
+                        }
+                    }
+                } else {
+                    let sdir = delta.normalize();
+                    if direction.dot(&sdir) >= angle {
+                        if let Some(data) = filter(spatial) {
+                            return Some((spatial.body, data));
+                        }
+                    }
+                }
+                None
+            })
+            .collect()
+    }
+
+    pub fn sample_field_of_view<F>(
+        &self,
+        position: Vec2,
+        mut direction: Vec2,
+        mut angle: Scalar,
+        range: Option<Scalar>,
+        mut filter: F,
+    ) -> Scalar
+    where
+        F: FnMut(&SpatialData) -> bool,
+    {
+        direction = direction.normalize();
+        angle = angle.cos();
+        self.cached_spatial_data
+            .nearest_neighbor_iterator(&[position.x, position.y])
+            .fold(0.0, |accum, spatial| {
+                let spos: Vec2 = spatial.position.into();
+                let delta = spos - position;
+                if let Some(range) = range {
+                    let dist = delta.magnitude();
+                    if dist <= range {
+                        let sdir = delta.normalize();
+                        let dot = direction.dot(&sdir);
+                        if dot >= angle && filter(spatial) {
+                            let fa = (dot - angle) / (1.0 - angle);
+                            let fd = 1.0 - (dist / range);
+                            return accum + fa * fd;
+                        }
+                    }
+                } else {
+                    let sdir = delta.normalize();
+                    let dot = direction.dot(&sdir);
+                    if dot >= angle && filter(spatial) {
+                        return accum + (dot - angle) / (1.0 - angle);
+                    }
+                }
+                accum
+            })
+    }
+
+    pub fn sample_raycast_bodies<F, T>(
+        &self,
+        position: Vec2,
+        direction: Vec2,
+        range: Option<Scalar>,
+        mut filter: F,
+    ) -> Vec<(BodyID, T)>
+    where
+        F: FnMut(&Body) -> Option<T>,
+    {
+        let ray = Ray::new(position.into(), direction.normalize());
+        let groups = CollisionGroups::new();
+        self.world
+            .collider_world()
+            .interferences_with_ray(&ray, &groups)
+            .filter_map(|(c, i)| {
+                if let Some(range) = range {
+                    if i.toi <= range {
+                        if let Some(body) = self.bodies.iter().find(|b| b.body_handle() == c.body())
+                        {
+                            if let Some(data) = filter(body) {
+                                return Some((body.id(), data));
+                            }
+                        }
+                    }
+                } else {
+                    if let Some(body) = self.bodies.iter().find(|b| b.body_handle() == c.body()) {
+                        if let Some(data) = filter(body) {
+                            return Some((body.id(), data));
+                        }
+                    }
+                }
+                None
+            })
+            .collect()
+    }
+
+    pub fn sample_raycast<F>(
+        &self,
+        position: Vec2,
+        direction: Vec2,
+        range: Option<Scalar>,
+        mut filter: F,
+    ) -> Scalar
+    where
+        F: FnMut(&Body) -> bool,
+    {
+        let ray = Ray::new(position.into(), direction.normalize());
+        let groups = CollisionGroups::new();
+        self.world
+            .collider_world()
+            .interferences_with_ray(&ray, &groups)
+            .fold(0.0, |accum, (c, i)| {
+                if let Some(range) = range {
+                    if i.toi <= range {
+                        if let Some(body) = self.bodies.iter().find(|b| b.body_handle() == c.body())
+                        {
+                            if filter(body) {
+                                return accum + 1.0 - i.toi / range;
+                            }
+                        }
+                    }
+                } else {
+                    if let Some(body) = self.bodies.iter().find(|b| b.body_handle() == c.body()) {
+                        if filter(body) {
+                            return accum + 1.0;
+                        }
+                    }
+                }
+                accum
+            })
+    }
+
     pub fn process(&mut self, dt: Scalar) {
         if (self.world.timestep() - dt).abs() < 0.01 {
             self.world.set_timestep(dt);
         }
         self.process_fluid_forces();
         self.world.step();
+        self.cache_bodies_states();
+        self.cache_spatial_data();
         self.process_cache_bodies_triggered();
         self.process_cache_bodies_contacted();
         self.process_fluid_apply_forces(dt);
@@ -182,6 +375,39 @@ impl PhysicsManager {
         self.cache_fluid_forces.clear();
     }
 
+    fn cache_bodies_states(&mut self) {
+        for body in &mut self.bodies {
+            if let Some(b) = self.world.rigid_body(body.body_handle()) {
+                if let Some(c) = self.world.collider(body.collider_handle()) {
+                    if let Some(s) = body.shape_handle().as_shape::<Ball<_>>() {
+                        body.cache_state(BodyState {
+                            position: b.position().translation.vector,
+                            rotation: b.position().rotation.angle(),
+                            radius: s.radius(),
+                            is_sensor: c.is_sensor(),
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    fn cache_spatial_data(&mut self) {
+        let spatial = self
+            .bodies
+            .iter()
+            .map(|body| {
+                let state = body.cached_state();
+                SpatialData::new(
+                    body.id(),
+                    [state.position.x, state.position.y],
+                    state.radius,
+                )
+            })
+            .collect();
+        self.cached_spatial_data = RTree::bulk_load(spatial);
+    }
+
     fn process_cache_bodies_triggered(&mut self) {
         self.cache_bodies_triggered = self
             .world
@@ -199,8 +425,8 @@ impl PhysicsManager {
                             .iter()
                             .find(|b| b.collider_handle() == proximity.collider2)
                         {
-                            let sensor_a = a.is_sensor(self).unwrap();
-                            let sensor_b = b.is_sensor(self).unwrap();
+                            let sensor_a = a.cached_state().is_sensor;
+                            let sensor_b = b.cached_state().is_sensor;
                             match (sensor_a, sensor_b) {
                                 (false, true) => {
                                     return Some(TriggeredBodiesPair {
@@ -255,7 +481,7 @@ impl PhysicsManager {
         for i in 0..self.bodies.len() {
             let (handle, pos) = {
                 let body = &self.bodies[i];
-                (body.body_handle(), body.position(&self).unwrap())
+                (body.body_handle(), body.cached_state().position)
             };
             if let Some(body) = self.world.rigid_body_mut(handle) {
                 let sampler = GridSamplerDistance::new((pos.x, pos.y), 100.0, (cw, ch));

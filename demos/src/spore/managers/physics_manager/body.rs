@@ -2,7 +2,7 @@
 
 use crate::managers::items_manager::Named;
 use crate::managers::physics_manager::PhysicsManager;
-use nalgebra::{UnitComplex, Vector2};
+use nalgebra::Vector2;
 use ncollide2d::shape::{Ball, ShapeHandle};
 use nphysics2d::algebra::{Force2, ForceType};
 use nphysics2d::object::Body as PhysicsBody;
@@ -14,12 +14,32 @@ use std::fmt;
 pub type BodyID = ID<Body>;
 pub type Vec2 = Vector2<Scalar>;
 
+#[derive(Debug, Clone)]
+pub struct BodyState {
+    pub position: Vec2,
+    pub rotation: Scalar,
+    pub radius: Scalar,
+    pub is_sensor: bool,
+}
+
+impl Default for BodyState {
+    fn default() -> Self {
+        Self {
+            position: Vec2::new(0.0, 0.0),
+            rotation: 0.0,
+            radius: 0.0,
+            is_sensor: false,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct Body {
     id: BodyID,
     shape_handle: ShapeHandle<Scalar>,
     collider_handle: ColliderHandle,
     body_handle: BodyHandle,
+    cached_state: BodyState,
 }
 
 impl Named<Self> for Body {
@@ -44,12 +64,23 @@ impl Body {
             shape_handle,
             collider_handle: collider.handle(),
             body_handle,
+            cached_state: Default::default(),
         }
     }
 
     pub fn free(&self, owner: &mut PhysicsManager) {
         owner.world_mut().remove_colliders(&[self.collider_handle]);
         owner.world_mut().remove_bodies(&[self.body_handle]);
+    }
+
+    #[inline]
+    pub fn cached_state(&self) -> &BodyState {
+        &self.cached_state
+    }
+
+    #[inline]
+    pub(crate) fn cache_state(&mut self, state: BodyState) {
+        self.cached_state = state;
     }
 
     #[inline]
@@ -63,97 +94,14 @@ impl Body {
     }
 
     #[inline]
-    pub fn position(&self, owner: &PhysicsManager) -> Option<Vec2> {
-        owner
-            .world()
-            .rigid_body(self.body_handle)
-            .map(|body| body.position().translation.vector)
-    }
-
-    #[inline]
-    pub fn rotation(&self, owner: &PhysicsManager) -> Option<Scalar> {
-        owner
-            .world()
-            .rigid_body(self.body_handle)
-            .map(|body| body.position().rotation.angle())
-    }
-
-    #[inline]
-    pub fn radius(&self) -> Option<Scalar> {
-        self.shape_handle
-            .as_shape::<Ball<_>>()
-            .map(|shape| shape.radius())
-    }
-
-    #[inline]
-    pub fn is_sensor(&self, owner: &PhysicsManager) -> Option<bool> {
-        owner
-            .world()
-            .collider(self.collider_handle)
-            .map(|collider| collider.is_sensor())
-    }
-
-    pub fn state(&self, owner: &PhysicsManager) -> Option<(Vec2, Scalar, Scalar)> {
-        if let Some(body) = owner.world().rigid_body(self.body_handle) {
-            if let Some(shape) = self.shape_handle.as_shape::<Ball<_>>() {
-                return Some((
-                    body.position().translation.vector,
-                    body.position().rotation.angle(),
-                    shape.radius(),
-                ));
-            }
-        }
-        None
-    }
-
-    pub fn set_position(&self, owner: &mut PhysicsManager, value: Vec2) {
-        if let Some(body) = owner.world_mut().rigid_body_mut(self.body_handle) {
-            let mut pos = *body.position();
-            pos.translation.vector = value;
-            body.set_position(pos);
-        }
-    }
-
-    pub fn set_rotation(&self, owner: &mut PhysicsManager, value: Scalar) {
-        if let Some(body) = owner.world_mut().rigid_body_mut(self.body_handle) {
-            let mut pos = *body.position();
-            pos.rotation = UnitComplex::new(value);
-            body.set_position(pos);
-        }
+    pub fn shape_handle(&self) -> &ShapeHandle<Scalar> {
+        &self.shape_handle
     }
 
     pub fn set_radius(&self, value: Scalar) {
         if let Some(ball) = self.shape_handle.as_shape::<Ball<_>>() {
             unsafe {
                 *(ball as *const Ball<_> as *mut Ball<_>) = Ball::new(value);
-            }
-        }
-    }
-
-    pub fn setup(
-        &self,
-        owner: &mut PhysicsManager,
-        position: Option<Vec2>,
-        rotation: Option<Scalar>,
-        radius: Option<Scalar>,
-    ) {
-        if position.is_some() || rotation.is_some() {
-            if let Some(body) = owner.world_mut().rigid_body_mut(self.body_handle) {
-                let mut pos = *body.position();
-                if let Some(position) = position {
-                    pos.translation.vector = position;
-                }
-                if let Some(rotation) = rotation {
-                    pos.rotation = UnitComplex::new(rotation);
-                }
-                body.set_position(pos);
-            }
-        }
-        if let Some(radius) = radius {
-            if let Some(ball) = self.shape_handle.as_shape::<Ball<_>>() {
-                unsafe {
-                    *(ball as *const Ball<_> as *mut Ball<_>) = Ball::new(radius);
-                }
             }
         }
     }
