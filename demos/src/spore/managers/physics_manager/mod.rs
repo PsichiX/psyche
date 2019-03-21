@@ -8,10 +8,10 @@ use body::*;
 use nalgebra::UnitComplex;
 use ncollide2d::events::ContactEvent;
 use ncollide2d::query::{Proximity, Ray};
-use ncollide2d::shape::{Ball, Cuboid, ShapeHandle};
+use ncollide2d::shape::Ball;
 use ncollide2d::world::CollisionGroups;
 use nphysics2d::algebra::{Force2, ForceType};
-use nphysics2d::object::{Body as PhysicsBody, BodyStatus, ColliderDesc, RigidBodyDesc};
+use nphysics2d::object::Body as PhysicsBody;
 use nphysics2d::world::World as PhysicsWorld;
 use psyche::core::Scalar;
 use psyche::utils::grid::{Grid, GridSampleZeroValue, GridSamplerCluster, GridSamplerDistance};
@@ -58,39 +58,6 @@ impl PhysicsManager {
     ) -> Self {
         let mut world = PhysicsWorld::default();
         world.set_gravity([0.0, 0.0].into());
-
-        let hw = bounds.0 * 0.5;
-        let hh = bounds.1 * 0.5;
-        let part = RigidBodyDesc::new()
-            .status(BodyStatus::Static)
-            .build(&mut world)
-            .part_handle();
-        {
-            let shape = ShapeHandle::new(Cuboid::new([hw, 50.0].into()));
-            ColliderDesc::new(shape.clone())
-                .density(1.0)
-                .translation([hw, -50.0].into())
-                .build_with_parent(part, &mut world)
-                .unwrap();
-            ColliderDesc::new(shape)
-                .density(1.0)
-                .translation([hw, bounds.1 + 50.0].into())
-                .build_with_parent(part, &mut world)
-                .unwrap();
-        }
-        {
-            let shape = ShapeHandle::new(Cuboid::new([50.0, hh].into()));
-            ColliderDesc::new(shape.clone())
-                .density(1.0)
-                .translation([-50.0, hh].into())
-                .build_with_parent(part, &mut world)
-                .unwrap();
-            ColliderDesc::new(shape)
-                .density(1.0)
-                .translation([bounds.0 + 50.0, hh].into())
-                .build_with_parent(part, &mut world)
-                .unwrap();
-        }
 
         let mut fluid_grid = Switch::new(
             2,
@@ -345,6 +312,7 @@ impl PhysicsManager {
         self.process_cache_bodies_contacted();
         self.process_fluid_apply_forces(dt);
         self.process_fluid_propagate_and_diffuse(dt);
+        self.wrap_bodies_to_bounds();
     }
 
     fn process_fluid_forces(&mut self) {
@@ -524,6 +492,37 @@ impl PhysicsManager {
                         let factor = 1.0 - self.fluid_diffuse.max(0.0).min(1.0) * dt;
                         *field_next = *field_next * factor;
                     }
+                }
+            }
+        }
+    }
+
+    fn wrap_bodies_to_bounds(&mut self) {
+        let bounds = self.bounds();
+        for body in &mut self.bodies {
+            let state = body.cached_state();
+            let mut position = state.position;
+            let radius = 0.0; //state.radius;
+            let mut apply = false;
+            if position.x < -radius {
+                position.x = bounds.0 + radius;
+                apply = true;
+            } else if position.x > bounds.0 + radius {
+                position.x = -radius;
+                apply = true;
+            }
+            if position.y < -radius {
+                position.y = bounds.1 + radius;
+                apply = true;
+            } else if position.y > bounds.1 + radius {
+                position.y = -radius;
+                apply = true;
+            }
+            if apply {
+                if let Some(body) = self.world.rigid_body_mut(body.body_handle()) {
+                    let mut pos = *body.position();
+                    pos.translation.vector = position;
+                    body.set_position(pos);
                 }
             }
         }

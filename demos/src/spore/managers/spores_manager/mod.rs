@@ -1,6 +1,7 @@
 pub mod spore;
 
 use crate::managers::brains_manager::BrainsManager;
+use crate::managers::food_manager::food::Food;
 use crate::managers::food_manager::FoodManager;
 use crate::managers::items_manager::{ItemsManager, Named};
 use crate::managers::physics_manager::body::BodyID;
@@ -122,6 +123,35 @@ impl SporesManager {
 
         // TODO: produce offspring if compatible DNA or eat smaller spore.
         // for contact in physics.cache_bodies_contacted() {}
+
+        let spores_to_destroy = self
+            .spores
+            .iter()
+            .filter_map(|spore| {
+                if spore.calories() <= 0.0 {
+                    Some(spore.id())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+        for id in spores_to_destroy {
+            if let Some(spore) = self.item_mut(id) {
+                if let Some(inner) = spore.inner() {
+                    if let Some(body) = physics.item(inner.body) {
+                        let state = body.cached_state();
+                        let position = state.position;
+                        let radius = state.radius;
+                        let calories = radius * radius * PI;
+                        let mut food = Food::default();
+                        food.born(calories, position.into(), physics, renderables);
+                        foods.add(food);
+                    }
+                }
+                spore.annihilate(physics, renderables, brains);
+            }
+            self.destroy(id);
+        }
     }
 }
 

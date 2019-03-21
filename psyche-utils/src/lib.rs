@@ -1,3 +1,4 @@
+pub mod bucket_strainer;
 pub mod grid;
 pub mod switch;
 

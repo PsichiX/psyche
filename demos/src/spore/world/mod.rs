@@ -103,7 +103,6 @@ impl World {
             &mut self.food,
             &mut self.renderables,
         );
-        self.food.process(&mut self.physics);
 
         self.spores
             .refresh(&self.physics, &mut self.renderables, &self.brains);

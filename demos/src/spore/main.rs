@@ -22,12 +22,12 @@ use psyche::core::config::Config;
 use psyche::core::Scalar;
 use std::ops::Range;
 
-const WORLD_SIZE: [u32; 2] = [800, 600];
-const RANDOMIZED_FLUID: Scalar = 5.0;
+const WORLD_SIZE: [u32; 2] = [1024, 768];
+const RANDOMIZED_FLUID: Scalar = 10.0;
 const FLUID_DIFFUSE: Scalar = 0.1;
 const FLUID_DRAG: Scalar = 0.1;
 const FLUID_RESOLUTION: usize = 20;
-const SPORES_COUNT: usize = 10;
+const SPORES_COUNT: usize = 6;
 const SPORES_RADIUS: Range<Scalar> = 10.0..20.0;
 const FOOD_COUNT: usize = 40;
 const FOOD_CALORIES: Range<Scalar> = 50.0..100.0;

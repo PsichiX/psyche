@@ -14,6 +14,8 @@ use psyche::core::Scalar;
 use std::collections::HashMap;
 use std::f64::consts::PI;
 
+const POTENTIAL_CALORIES_SCALE: Scalar = 0.01;
+
 pub type SporeID = ID<Spore>;
 
 #[derive(Debug, Clone, Default)]
@@ -60,6 +62,11 @@ impl Spore {
     }
 
     #[inline]
+    pub fn calories(&self) -> Scalar {
+        self.calories
+    }
+
+    #[inline]
     pub fn feed(&mut self, calories: Scalar) {
         self.calories += calories;
     }
@@ -86,6 +93,7 @@ impl Spore {
         }
 
         let (position, rotation, radius) = position_rotation_radius;
+        self.calories = radius * radius * PI;
         let body = physics.create_with(|body, owner| {
             owner.setup(body, Some(position.into()), Some(rotation));
             body.set_radius(radius);
@@ -212,17 +220,21 @@ impl Spore {
                                 None,
                                 |spatial| food.item_by_body(spatial.body).is_some(),
                             );
-                            drop(brain.sensor_trigger_impulse(*sensor, potential));
-                            detector_state.potential = potential;
+                            if potential > 0.1 && self.calories > 0.0 {
+                                drop(brain.sensor_trigger_impulse(*sensor, potential));
+                                detector_state.potential = potential;
+                                self.calories -= potential * POTENTIAL_CALORIES_SCALE;
+                            }
                         }
                     }
                     for (effector, leg_state) in &mut inner.legs {
                         if let Ok(potential) = brain.effector_potential_release(*effector) {
-                            if potential > 0.1 {
+                            if potential > 0.1 && self.calories > 0.0 {
                                 leg_state.phase = (leg_state.phase + 1) % 4;
                                 let r = rotation + leg_state.angle;
                                 let f = Vec2::new(r.cos(), r.sin()) * radius * -0.1;
                                 physics.apply_fluid_force(position, f);
+                                self.calories -= potential * POTENTIAL_CALORIES_SCALE;
                             }
                         }
                     }

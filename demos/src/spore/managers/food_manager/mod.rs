@@ -40,38 +40,6 @@ impl FoodManager {
             }
         }
     }
-
-    pub fn process(&self, physics: &mut PhysicsManager) {
-        let bounds = physics.bounds();
-        for food in &self.food {
-            if let Some(inner) = food.inner() {
-                physics.with(inner.body, |body, owner| {
-                    let state = body.cached_state();
-                    let mut position = state.position;
-                    let radius = state.radius;
-                    let radius2 = radius * 2.0;
-                    let mut apply = false;
-                    if position.x < -radius2 {
-                        position.x = bounds.0 + radius;
-                        apply = true;
-                    } else if position.x > bounds.0 + radius2 {
-                        position.x = -radius;
-                        apply = true;
-                    }
-                    if position.y < -radius2 {
-                        position.y = bounds.1 + radius;
-                        apply = true;
-                    } else if position.y > bounds.1 + radius2 {
-                        position.y = -radius;
-                        apply = true;
-                    }
-                    if apply {
-                        owner.set_body_position(body, position);
-                    }
-                });
-            }
-        }
-    }
 }
 
 impl ItemsManager<Food> for FoodManager {
