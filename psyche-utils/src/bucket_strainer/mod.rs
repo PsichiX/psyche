@@ -1,3 +1,5 @@
+//! Tools used to split data collection by their utility/category.
+
 mod bucket;
 mod layer;
 mod rules;

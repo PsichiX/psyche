@@ -43,15 +43,6 @@ fn main() {
                 .long("headless")
                 .help("Headless mode"),
         )
-        // .arg(
-        //     Arg::with_name("snapshot")
-        //         .short("s")
-        //         .long("snapshot")
-        //         .value_name("FILE")
-        //         .help("World snapshot file path")
-        //         .takes_value(true)
-        //         .required(false),
-        // )
         .get_matches();
 
     let mut config = Config::default();

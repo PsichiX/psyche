@@ -1,3 +1,5 @@
+//! Tool used to sequentialy switch between many options of same data.
+
 /// Collection that contains several versions/options of data so you can switch between them in
 /// sequential manner. It can be used to produce next data frame based on previous data frame.
 ///

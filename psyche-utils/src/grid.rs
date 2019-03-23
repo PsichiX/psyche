@@ -1,3 +1,5 @@
+//! Tool used to store and sample grid-like data.
+
 use crate::Scalar;
 use std::ops::{Add, Index, IndexMut, Mul};
 
