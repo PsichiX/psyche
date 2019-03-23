@@ -1,8 +1,10 @@
 use crate::bucket_strainer::{Bucket, Rule};
 use crate::Scalar;
 
+/// Bucket rule that multiply scores of all of its subrules.
 #[derive(Clone)]
 pub struct MulRule<T> {
+    /// List of subrules to score.
     pub rules: Vec<Box<dyn Rule<T>>>,
 }
 

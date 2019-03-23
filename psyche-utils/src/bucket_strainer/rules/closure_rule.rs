@@ -1,11 +1,13 @@
 use crate::bucket_strainer::{Bucket, Rule};
 use crate::Scalar;
 
+/// Bucket rule that applies score based on closure result.
 #[derive(Clone)]
 pub struct ClosureRule<T>
 where
     T: Clone,
 {
+    /// Closure that will calculate item score.
     pub closure: fn(&T, &Bucket<T>) -> Scalar,
 }
 

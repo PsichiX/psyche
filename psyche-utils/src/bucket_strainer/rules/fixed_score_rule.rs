@@ -1,8 +1,10 @@
 use crate::bucket_strainer::{Bucket, Rule};
 use crate::Scalar;
 
+/// Bucket rule that always gives specified score.
 #[derive(Clone)]
 pub struct FixedScoreRule {
+    /// Score value.
     pub score: Scalar,
 }
 

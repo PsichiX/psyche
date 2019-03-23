@@ -2,6 +2,8 @@ use crate::bucket_strainer::{Layer, Rule};
 use crate::Scalar;
 use std::mem;
 
+/// Bucket strainer bucket that contains rule that scores items and collection of items that fallen
+/// into it on processing phase.
 #[derive(Clone)]
 pub struct Bucket<T>
 where
@@ -42,7 +44,7 @@ where
         mem::replace(&mut self.rule, rule)
     }
 
-    pub fn score(&self, item: &T) -> Option<Scalar> {
+    pub(crate) fn score(&self, item: &T) -> Option<Scalar> {
         let score = self.rule.score(item, self);
         if score > self.acceptable_score_treshold {
             Some(score)

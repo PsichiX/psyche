@@ -1,6 +1,7 @@
 use crate::bucket_strainer::Bucket;
 use std::mem;
 
+/// Bucket strainer layer that contains buckets.
 #[derive(Clone)]
 pub struct Layer<T>
 where
@@ -29,13 +30,13 @@ where
         self.buckets.iter().find(|bucket| bucket.id() == id)
     }
 
-    pub fn clear_buckets(&mut self) {
+    pub(crate) fn clear_buckets(&mut self) {
         for bucket in &mut self.buckets {
             bucket.clear();
         }
     }
 
-    pub fn process(&mut self, items: Vec<T>) -> Vec<T> {
+    pub(crate) fn process(&mut self, items: Vec<T>) -> Vec<T> {
         items
             .into_iter()
             .filter(|item| {

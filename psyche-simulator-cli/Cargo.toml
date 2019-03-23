@@ -1,6 +1,6 @@
 [package]
 name = "psyche-simulator-cli"
-version = "0.2.11"
+version = "0.2.12"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 edition = "2018"
 description = "CLI simulator for Psyche AI Toolset"

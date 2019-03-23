@@ -1,8 +1,10 @@
 use crate::bucket_strainer::{Bucket, Rule};
 use crate::Scalar;
 
+/// Bucket rule that scores `1.0` as long as given bucket has less items than specified limit.
 #[derive(Clone)]
 pub struct BucketLimitRule {
+    /// Number of items that bucket can have.
     pub limit: usize,
 }
 
@@ -17,10 +19,10 @@ where
     T: Clone,
 {
     fn score(&self, _: &T, bucket: &Bucket<T>) -> Scalar {
-        if bucket.items().len() > self.limit {
-            0.0
-        } else {
+        if bucket.items().len() < self.limit {
             1.0
+        } else {
+            0.0
         }
     }
 

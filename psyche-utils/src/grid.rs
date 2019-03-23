@@ -1,6 +1,12 @@
 use crate::Scalar;
 use std::ops::{Add, Index, IndexMut, Mul};
 
+/// Collection that holds data in 2d grid-like manner.
+/// Grid can be:
+/// - accessed by inspection of each element;
+/// - filled with same value for all fields;
+/// - filled with values got from closure that produces value for each field individually;
+/// - sampled with any type that implements `GridSampler` trai.
 #[derive(Clone, Default)]
 pub struct Grid<T> {
     cols: usize,
@@ -8,12 +14,30 @@ pub struct Grid<T> {
     fields: Vec<T>,
 }
 
-impl<T> Grid<T>
-where
-    T: Clone,
-{
+impl<T> Grid<T> {
+    /// Creates new grid.
+    ///
+    /// # Arguments
+    /// * `cols` - Number of columns.
+    /// * `rows` - Number of rows.
+    /// * `value` - Initial value applied for each field.
+    ///
+    /// # Return
+    /// Instance of grid.
+    ///
+    /// # Example
+    /// ```
+    /// use psyche_utils::grid::{Grid, GridSamplerCluster};
+    ///
+    /// let grid = Grid::new(2, 2, 1.0);
+    /// let sampler = GridSamplerCluster::new((0, 0), (1, 1));
+    /// assert_eq!(grid.sample(sampler).unwrap(), (4.0, 4));
+    /// ```
     #[inline]
-    pub fn new(cols: usize, rows: usize, value: T) -> Self {
+    pub fn new(cols: usize, rows: usize, value: T) -> Self
+    where
+        T: Clone,
+    {
         Self {
             cols,
             rows,
@@ -21,31 +45,119 @@ where
         }
     }
 
+    /// Gets number of columns.
+    ///
+    /// # Return
+    /// Number of columns.
+    ///
+    /// # Example
+    /// ```
+    /// use psyche_utils::grid::Grid;
+    ///
+    /// let grid = Grid::new(2, 2, 1.0);
+    /// assert_eq!(grid.cols(), 2);
+    /// ```
     #[inline]
     pub fn cols(&self) -> usize {
         self.cols
     }
 
+    /// Gets number of rows.
+    ///
+    /// # Return
+    /// Number of rows.
+    ///
+    /// # Example
+    /// ```
+    /// use psyche_utils::grid::Grid;
+    ///
+    /// let grid = Grid::new(2, 2, 1.0);
+    /// assert_eq!(grid.rows(), 2);
+    /// ```
     #[inline]
     pub fn rows(&self) -> usize {
         self.rows
     }
 
+    /// Gets slice of fields.
+    ///
+    /// # Return
+    /// Reference to slice of fields that holds.
+    ///
+    /// # Example
+    /// ```
+    /// use psyche_utils::grid::Grid;
+    ///
+    /// let grid = Grid::new(2, 2, 1.0);
+    /// assert_eq!(grid.fields(), &[1.0, 1.0, 1.0, 1.0]);
+    /// ```
     #[inline]
     pub fn fields(&self) -> &[T] {
         &self.fields
     }
 
+    /// Gets slice of fields.
+    ///
+    /// # Return
+    /// Mutable reference to slice of fields that holds.
+    ///
+    /// # Example
+    /// ```
+    /// use psyche_utils::grid::Grid;
+    ///
+    /// let mut grid = Grid::new(2, 2, 0.0);
+    /// let mut i = 1.0;
+    /// for field in grid.fields_mut() {
+    ///     *field = i;
+    ///     i += 1.0;
+    /// }
+    /// assert_eq!(grid.fields(), &[1.0, 2.0, 3.0, 4.0]);
+    /// ```
+    #[inline]
     pub fn fields_mut(&mut self) -> &mut [T] {
         &mut self.fields
     }
 
+    /// Fiils grid with same value.
+    ///
+    /// # Arguments
+    /// * `value` - Value that will be applied to each field.
+    ///
+    /// # Example
+    /// ```
+    /// use psyche_utils::grid::Grid;
+    ///
+    /// let mut grid = Grid::new(2, 2, 0.0);
+    /// grid.fill_all(1.0);
+    /// assert_eq!(grid.fields(), &[1.0, 1.0, 1.0, 1.0]);
+    /// ```
     #[inline]
-    pub fn fill_all(&mut self, value: T) {
+    pub fn fill_all(&mut self, value: T)
+    where
+        T: Clone,
+    {
         self.fields = vec![value; self.cols * self.rows];
     }
 
-    pub fn fill(&mut self, col_row: (usize, usize), size: (usize, usize), value: T) {
+    /// Fiils grid with same value to fields contained by specified bounds.
+    ///
+    /// # Arguments
+    /// * `col_row` - Starting column and row.
+    /// * `size` - Number of columns and rows of bounds.
+    /// * `value` - Value that will be applied to each field.
+    ///
+    /// # Example
+    /// ```
+    /// use psyche_utils::grid::Grid;
+    ///
+    /// let mut grid = Grid::new(2, 2, 0.0);
+    /// grid.fill((1, 0), (1, 2), 1.0);
+    /// assert_eq!(grid.fields(), &[0.0, 1.0, 0.0, 1.0]);
+    /// ```
+    pub fn fill(&mut self, col_row: (usize, usize), size: (usize, usize), value: T)
+    where
+        T: Clone,
+    {
         for y in col_row.1.min(self.rows)..(col_row.1 + size.1).min(self.rows) {
             for x in col_row.0.min(self.cols)..(col_row.0 + size.0).min(self.cols) {
                 let index = y * self.cols + x;
@@ -54,6 +166,19 @@ where
         }
     }
 
+    /// Fiils grid with values got from producer closure.
+    ///
+    /// # Arguments
+    /// * `with` - Closure that will produce value for each field based on their col-row coords.
+    ///
+    /// # Example
+    /// ```
+    /// use psyche_utils::grid::Grid;
+    ///
+    /// let mut grid = Grid::new(2, 2, 0.0);
+    /// grid.fill_with(|col, row| Some((col + row) as f32));
+    /// assert_eq!(grid.fields(), &[0.0, 1.0, 1.0, 2.0]);
+    /// ```
     pub fn fill_with<F>(&mut self, mut with: F)
     where
         F: FnMut(usize, usize) -> Option<T>,
@@ -68,6 +193,19 @@ where
         }
     }
 
+    /// Inspect and/or edit fields with closure.
+    ///
+    /// # Arguments
+    /// * `with` - Closure that will inspect and allow to edit each field.
+    ///
+    /// # Example
+    /// ```
+    /// use psyche_utils::grid::Grid;
+    ///
+    /// let mut grid = Grid::new(2, 2, 0.0);
+    /// grid.with(|col, row, field| *field = (col + row) as f32);
+    /// assert_eq!(grid.fields(), &[0.0, 1.0, 1.0, 2.0]);
+    /// ```
     pub fn with<F>(&mut self, mut with: F)
     where
         F: FnMut(usize, usize, &mut T),
@@ -79,6 +217,19 @@ where
         }
     }
 
+    /// Sample grid fields using given sampler.
+    ///
+    /// # Arguments
+    /// * `sampler` - Sampler object that implements `GridSampler` trait.
+    ///
+    /// # Example
+    /// ```
+    /// use psyche_utils::grid::{Grid, GridSamplerCluster};
+    ///
+    /// let grid = Grid::new(2, 2, 1.0);
+    /// let sampler = GridSamplerCluster::new((0, 0), (1, 1));
+    /// assert_eq!(grid.sample(sampler).unwrap(), (4.0, 4));
+    /// ```
     pub fn sample<S, W>(&self, sampler: S) -> Option<(T, W)>
     where
         S: GridSampler<T, W>,
@@ -123,11 +274,67 @@ impl<T> IndexMut<[usize; 2]> for Grid<T> {
     }
 }
 
+/// Trait used to sample pair of single value and weight from grid.
 pub trait GridSampler<T, W> {
+    /// Sample value and weight from given grid.
+    ///
+    /// # Arguments
+    /// * `grid` - Grid that we sample from.
+    ///
+    /// # Return
+    /// Pair of single value and weight as result of grid sampling.
+    ///
+    /// # Example
+    /// ```
+    /// use psyche_utils::grid::{Grid, GridSampler};
+    ///
+    /// struct MySampler;
+    ///
+    /// impl GridSampler<f32, usize> for MySampler {
+    ///     fn sample(self, grid: &Grid<f32>) -> Option<(f32, usize)> {
+    ///         let value = grid.fields().iter().cloned().sum();
+    ///         let weight = grid.fields().len();
+    ///         Some((value, weight))
+    ///     }
+    /// }
+    ///
+    /// let grid = Grid::new(2, 2, 1.0);
+    /// let sampler = MySampler {};
+    /// assert_eq!(grid.sample(sampler).unwrap(), (4.0, 4));
+    /// ```
     fn sample(self, grid: &Grid<T>) -> Option<(T, W)>;
 }
 
+/// Trait used to obtain zero value for given type. It is used by built-in samplers and it's
+/// implemented for `f32` and `f64` types so if you want to sample any other type of grid, you have
+/// implement this trait for that type.
 pub trait GridSampleZeroValue<T> {
+    /// produce zero value for given type.
+    ///
+    /// # Return
+    /// Zero value of given type.
+    ///
+    /// # Example
+    /// ```
+    /// use psyche_utils::grid::{Grid, GridSamplerCluster, GridSampleZeroValue};
+    /// use std::ops::Add;
+    ///
+    /// #[derive(Debug, Copy, Clone, Eq, PartialEq)]
+    /// struct Integer(pub i32);
+    ///
+    /// impl Add for Integer {
+    ///     type Output = Integer;
+    ///     fn add(self, other: Integer) -> Integer { Integer(self.0 + other.0) }
+    /// }
+    ///
+    /// impl GridSampleZeroValue<Self> for Integer {
+    ///     fn sample_zero_value() -> Self { Integer(0) }
+    /// }
+    ///
+    /// let grid = Grid::new(2, 2, Integer(1));
+    /// let sampler = GridSamplerCluster::new((0, 0), (1, 1));
+    /// assert_eq!(grid.sample(sampler).unwrap(), (Integer(4), 4));
+    /// ```
     fn sample_zero_value() -> T;
 }
 
@@ -143,9 +350,24 @@ impl GridSampleZeroValue<Self> for f64 {
     }
 }
 
+/// Grid sampler that sum fields contained by cluster bounds.
+///
+/// # Note
+/// Weight component of sampling result equals number of sampled fields.
+///
+/// # Example
+/// ```
+/// use psyche_utils::grid::{Grid, GridSamplerCluster};
+///
+/// let grid = Grid::new(2, 2, 1.0);
+/// let sampler = GridSamplerCluster::new((0, 0), (1, 1));
+/// assert_eq!(grid.sample(sampler).unwrap(), (4.0, 4));
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GridSamplerCluster {
+    /// Bounds column and row starting point.
     pub from: (usize, usize),
+    /// Bounds number of columns and rows that defines cluster size.
     pub to: (usize, usize),
 }
 
@@ -230,10 +452,27 @@ where
     }
 }
 
+/// Grid sampler that uses field distance to center and maximum range - each field is scaled by
+/// weight produced from that distance-in-range equation.
+///
+/// # Note
+/// Weight component of sampling result equals sum of weights of each sampled fields.
+///
+/// # Example
+/// ```
+/// use psyche_utils::grid::{Grid, GridSamplerDistance};
+///
+/// let grid = Grid::new(2, 2, 1.0);
+/// let sampler = GridSamplerDistance::new((0.0, 0.0), 1.0, (1.0, 1.0));
+/// assert_eq!(grid.sample(sampler).unwrap(), (1.0, 1.0));
+/// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct GridSamplerDistance {
+    /// XY scalar position of sampler center.
     pub center: (Scalar, Scalar),
+    /// Range of sampling.
     pub range: Scalar,
+    /// Scale mapping between grid cell and world cell.
     pub cell_size: (Scalar, Scalar),
 }
 
