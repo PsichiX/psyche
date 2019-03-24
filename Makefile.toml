@@ -1,0 +1,208 @@
+[tasks.all]
+dependencies = [
+  "toolset",
+  "demos",
+]
+
+[tasks.toolset]
+dependencies = [
+  "build",
+  "toolset-cleanup",
+  "toolset-produce",
+  "build-capi",
+  "archive-toolset",
+]
+
+[tasks.build]
+dependencies = [
+  "build-debug",
+  "build-release",
+]
+
+[tasks.build-debug]
+command = "cargo"
+args = [
+  "build",
+  "--all",
+]
+
+[tasks.build-release]
+command = "cargo"
+args = [
+  "build",
+  "--all",
+  "--release",
+]
+
+[tasks.build-capi-h]
+command = "cbindgen"
+args = [
+  "psyche-capi",
+  "-l",
+  "c",
+  "-o",
+  "dist/toolset/include/psyche_capi.h",
+]
+
+[tasks.build-capi-hpp]
+command = "cbindgen"
+args = [
+  "psyche-capi",
+  "-l",
+  "c++",
+  "-o",
+  "dist/toolset/include/psyche_capi.hpp",
+]
+
+[tasks.build-capi]
+dependencies = [
+  "build-capi-h",
+  "build-capi-hpp",
+]
+
+[tasks.toolset-cleanup]
+script = [
+  '''
+  echo "* cleanup toolset"
+  rm -rf dist/toolset
+  mkdir -p dist/toolset/bin
+  mkdir -p dist/toolset/lib
+  mkdir -p dist/toolset/lib/debug
+  mkdir -p dist/toolset/lib/release
+  mkdir -p dist/toolset/include
+  '''
+]
+
+[tasks.toolset-cleanup.windows]
+script = [
+  '''
+  echo "* cleanup toolset"
+  rmdir /s /q "%CD%"\dist\toolset
+  mkdir "%CD%"\dist\toolset\bin
+  mkdir "%CD%"\dist\toolset\lib
+  mkdir "%CD%"\dist\toolset\lib\debug
+  mkdir "%CD%"\dist\toolset\lib\release
+  mkdir "%CD%"\dist\toolset\include
+  '''
+]
+
+[tasks.toolset-produce]
+script = [
+  '''
+  echo "* produce toolset"
+  cp target/release/psysim dist/toolset/bin/psysim
+  cp target/debug/psysim dist/toolset/bin/psysim-d
+  cp target/debug/psyche_capi.a dist/toolset/lib/debug/psyche_capi.a
+  cp target/debug/psyche_capi.so dist/toolset/lib/debug/psyche_capi.so
+  cp target/debug/psyche_capi.so.a dist/toolset/lib/debug/psyche_capi.so.a
+  cp target/release/psyche_capi.a dist/toolset/lib/release/psyche_capi.a
+  cp target/release/psyche_capi.so dist/toolset/lib/release/psyche_capi.so
+  cp target/release/psyche_capi.so.a dist/toolset/lib/release/psyche_capi.so.a
+  '''
+]
+
+[tasks.toolset-produce.windows]
+script = [
+  '''
+  echo "* produce toolset"
+  copy "%CD%"\target\release\psysim.exe "%CD%"\dist\toolset\bin\psysim.exe
+  copy "%CD%"\target\debug\psysim.exe "%CD%"\dist\toolset\bin\psysim-d.exe
+  copy "%CD%"\target\debug\psyche_capi.lib "%CD%"\dist\toolset\lib\debug\psyche_capi.lib
+  copy "%CD%"\target\debug\psyche_capi.dll "%CD%"\dist\toolset\lib\debug\psyche_capi.dll
+  copy "%CD%"\target\debug\psyche_capi.dll.lib "%CD%"\dist\toolset\lib\debug\psyche_capi.dll.lib
+  copy "%CD%"\target\release\psyche_capi.lib "%CD%"\dist\toolset\lib\release\psyche_capi.lib
+  copy "%CD%"\target\release\psyche_capi.dll "%CD%"\dist\toolset\lib\release\psyche_capi.dll
+  copy "%CD%"\target\release\psyche_capi.dll.lib "%CD%"\dist\toolset\lib\release\psyche_capi.dll.lib
+  '''
+]
+
+[tasks.demos]
+dependencies = [
+  "build-demos",
+  "demos-cleanup",
+  "produce-demos",
+  "archive-demos",
+]
+
+[tasks.build-demos]
+dependencies = [
+  "build-demos-debug",
+  "build-demos-release",
+]
+
+[tasks.build-demos-debug]
+command = "cargo"
+args = [
+  "build",
+  "--manifest-path",
+  "demos/Cargo.toml",
+]
+
+[tasks.build-demos-release]
+command = "cargo"
+args = [
+  "build",
+  "--manifest-path",
+  "demos/Cargo.toml",
+  "--release",
+]
+
+[tasks.demos-cleanup]
+script = [
+  '''
+  echo "* cleanup demos"
+  rm -rf dist/demos
+  mkdir -p dist/demos
+  '''
+]
+
+[tasks.demos-cleanup.windows]
+script = [
+  '''
+  echo "* cleanup demos"
+  rmdir /s /q "%CD%"\dist\demos
+  mkdir "%CD%"\dist\demos
+  '''
+]
+
+[tasks.produce-demos]
+script = [
+  '''
+  echo "* produce demos"
+  cp demos/target/release/brain-activity dist/demos/brain-activity
+  cp demos/target/debug/brain-activity dist/demos/brain-activity-d
+  cp demos/target/release/spore dist/demos/spore
+  cp demos/target/debug/spore dist/demos/spore-d
+  '''
+]
+
+[tasks.produce-demos.windows]
+script = [
+  '''
+  echo "* produce demos"
+  copy "%CD%"\demos\target\release\brain-activity.exe "%CD%"\dist\demos\brain-activity.exe
+  copy "%CD%"\demos\target\debug\brain-activity.exe "%CD%"\dist\demos\brain-activity-d.exe
+  copy "%CD%"\demos\target\release\spore.exe "%CD%"\dist\demos\spore.exe
+  copy "%CD%"\demos\target\debug\spore.exe "%CD%"\dist\demos\spore-d.exe
+  '''
+]
+
+[tasks.archive-toolset]
+script = [
+  '''$SEVENZIP_BIN a -tzip dist/psyche-toolset-${PSYCHE_VERSION}-lin64.zip dist/toolset/*'''
+]
+
+[tasks.archive-toolset.windows]
+script = [
+  '''%SEVENZIP_BIN% a -tzip "%CD%\dist\psyche-toolset-%PSYCHE_VERSION%-win64.zip" "%CD%\dist\toolset\*"'''
+]
+
+[tasks.archive-demos]
+script = [
+  '''$SEVENZIP_BIN a -tzip dist/demos-${PSYCHE_VERSION}-lin64.zip dist/demos/*'''
+]
+
+[tasks.archive-demos.windows]
+script = [
+  '''%SEVENZIP_BIN% a -tzip "%CD%\dist\demos-%PSYCHE_VERSION%-win64.zip" "%CD%\dist\demos\*"'''
+]

@@ -21,6 +21,15 @@ impl<T> ID<T> {
         Self::default()
     }
 
+    /// Creates new identifier from raw bytes.
+    #[inline]
+    pub fn from_bytes(bytes: [u8; 16]) -> Self {
+        Self {
+            id: Uuid::from_bytes(bytes),
+            _phantom: PhantomData,
+        }
+    }
+
     /// Gets underlying UUID object.
     #[inline]
     pub fn uuid(&self) -> Uuid {

@@ -526,6 +526,12 @@ impl Brain {
         }
     }
 
+    pub fn kill_synapses_impulses(&mut self) {
+        for synapse in &mut self.synapses {
+            synapse.impulses.len();
+        }
+    }
+
     pub fn process(&mut self, delta_time: Scalar) -> Result<()> {
         if self.neurons.is_empty() {
             return Ok(());
