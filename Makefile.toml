@@ -10,6 +10,8 @@ dependencies = [
   "toolset-cleanup",
   "toolset-produce",
   "build-capi",
+  "build-dotnet-wrapper",
+  "toolset-post-produce",
   "archive-toolset",
 ]
 
@@ -58,6 +60,32 @@ args = [
 dependencies = [
   "build-capi-h",
   "build-capi-hpp",
+]
+
+[tasks.build-dotnet-wrapper]
+dependencies = [
+  "build-dotnet-wrapper-debug",
+  "build-dotnet-wrapper-release",
+]
+
+[tasks.build-dotnet-wrapper-debug]
+script = [
+  "$MSBUILD_BIN ./dotnet/Psyche.NET.sln /t:Build /p:Configuration=Debug"
+]
+
+[tasks.build-dotnet-wrapper-debug.windows]
+script = [
+  "%MSBUILD_BIN% ./dotnet/Psyche.NET.sln /t:Build /p:Configuration=Debug"
+]
+
+[tasks.build-dotnet-wrapper-release]
+script = [
+  "$MSBUILD_BIN ./dotnet/Psyche.NET.sln /t:Build /p:Configuration=Release"
+]
+
+[tasks.build-dotnet-wrapper-release.windows]
+script = [
+  "%MSBUILD_BIN% ./dotnet/Psyche.NET.sln /t:Build /p:Configuration=Release"
 ]
 
 [tasks.toolset-cleanup]
@@ -113,6 +141,24 @@ script = [
   copy "%CD%"\target\release\psyche_capi.lib "%CD%"\dist\toolset\lib\release\psyche_capi.lib
   copy "%CD%"\target\release\psyche_capi.dll "%CD%"\dist\toolset\lib\release\psyche_capi.dll
   copy "%CD%"\target\release\psyche_capi.dll.lib "%CD%"\dist\toolset\lib\release\psyche_capi.dll.lib
+  '''
+]
+
+[tasks.toolset-post-produce]
+script = [
+  '''
+  echo "* post produce toolset"
+  cp -r dotnet/Psyche.NET/bin/Debug/netstandard2.0 dist/toolset/lib/debug/
+  cp -r dotnet/Psyche.NET/bin/Release/netstandard2.0 dist/toolset/lib/release/
+  '''
+]
+
+[tasks.toolset-post-produce.windows]
+script = [
+  '''
+  echo "* post produce toolset"
+  xcopy "%CD%"\dotnet\Psyche.NET\bin\Debug\netstandard2.0 "%CD%"\dist\toolset\lib\debug\
+  xcopy "%CD%"\dotnet\Psyche.NET\bin\Release\netstandard2.0 "%CD%"\dist\toolset\lib\release\
   '''
 ]
 

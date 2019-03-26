@@ -526,9 +526,15 @@ impl Brain {
         }
     }
 
-    pub fn kill_synapses_impulses(&mut self) {
+    pub fn kill_impulses(&mut self) {
+        for neuron in &mut self.neurons {
+            neuron.fire();
+        }
         for synapse in &mut self.synapses {
             synapse.impulses.len();
+        }
+        for effector in &mut self.effectors {
+            effector.potential = 0.0;
         }
     }
 

@@ -202,13 +202,19 @@ impl Default for OffspringBuilderConfig {
 }
 
 #[no_mangle]
-pub extern "C" fn psyche_default_brain_builder_config() -> BrainBuilderConfig {
-    Default::default()
+pub unsafe extern "C" fn psyche_default_brain_builder_config(config: *mut BrainBuilderConfig) {
+    if !config.is_null() {
+        *config = Default::default()
+    }
 }
 
 #[no_mangle]
-pub extern "C" fn psyche_default_offspring_builder_config() -> OffspringBuilderConfig {
-    Default::default()
+pub unsafe extern "C" fn psyche_default_offspring_builder_config(
+    config: *mut OffspringBuilderConfig,
+) {
+    if !config.is_null() {
+        *config = Default::default()
+    }
 }
 
 #[no_mangle]
@@ -314,7 +320,7 @@ pub extern "C" fn psyche_deserialize_bytes_brain(
     let bytes = bytes_from_raw(bytes, size);
     if let Ok(mut brain) = brain_from_bytes(&bytes) {
         if kill_impulses {
-            brain.kill_synapses_impulses();
+            brain.kill_impulses();
         }
         let handle = {
             let mut gen = HANDLE_GEN.lock().unwrap();
@@ -337,7 +343,7 @@ pub extern "C" fn psyche_deserialize_json_brain(
     let json = string_from_raw_unsized(json as *const libc::c_uchar);
     if let Ok(mut brain) = brain_from_json(&json) {
         if kill_impulses {
-            brain.kill_synapses_impulses();
+            brain.kill_impulses();
         }
         let handle = {
             let mut gen = HANDLE_GEN.lock().unwrap();
@@ -360,7 +366,7 @@ pub extern "C" fn psyche_deserialize_yaml_brain(
     let yaml = string_from_raw_unsized(yaml as *const libc::c_uchar);
     if let Ok(mut brain) = brain_from_yaml(&yaml) {
         if kill_impulses {
-            brain.kill_synapses_impulses();
+            brain.kill_impulses();
         }
         let handle = {
             let mut gen = HANDLE_GEN.lock().unwrap();
@@ -429,13 +435,18 @@ pub extern "C" fn psyche_brain_sensor_trigger_impulse(
 }
 
 #[no_mangle]
-pub extern "C" fn psyche_brain_effector_potential_release(handle: Handle, uid: UID) -> Opt<Scalar> {
+pub unsafe extern "C" fn psyche_brain_effector_potential_release(
+    handle: Handle,
+    uid: UID,
+    out_result: *mut Scalar,
+) -> bool {
     if let Some(brain) = BRAINS.lock().unwrap().get_mut(&handle) {
         if let Ok(potential) = brain.effector_potential_release(uid.into_id()) {
-            return Opt::some(potential);
+            *out_result = potential;
+            return true;
         }
     }
-    Opt::none()
+    false
 }
 
 #[no_mangle]
@@ -443,7 +454,7 @@ pub unsafe extern "C" fn psyche_offspring_mutated(
     config: *const OffspringBuilderConfig,
     handle: Handle,
 ) -> Handle {
-    if !config.is_null() {
+    if config.is_null() {
         return 0;
     }
     if let Some(brain) = BRAINS.lock().unwrap().get(&handle) {
@@ -467,7 +478,7 @@ pub unsafe extern "C" fn psyche_offspring_merged(
     handle_a: Handle,
     handle_b: Handle,
 ) -> Handle {
-    if !config.is_null() {
+    if config.is_null() {
         return 0;
     }
     let brains = BRAINS.lock().unwrap();
