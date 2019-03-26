@@ -29,4 +29,7 @@ members = [
 exclude = [
   "demos",
   "media",
+  "cpp",
+  "dotnet",
+  "dist",
 ]
