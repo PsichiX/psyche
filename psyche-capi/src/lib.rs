@@ -3,7 +3,7 @@ extern crate psyche;
 #[macro_use]
 extern crate lazy_static;
 
-use psyche::core::brain::Brain;
+use psyche::core::brain::{Brain, BrainActivityStats as PsycheBrainActivityStats};
 use psyche::core::brain_builder::BrainBuilder;
 use psyche::core::config::Config;
 use psyche::core::id::ID;
@@ -197,6 +197,53 @@ impl Default for OffspringBuilderConfig {
             new_effectors: 1,
             no_loop_connections: true,
             max_connecting_tries: 10,
+        }
+    }
+}
+
+#[repr(C)]
+pub struct BrainActivityStats {
+    pub neurons_count: usize,
+    pub synapses_count: usize,
+    pub impulses_count: usize,
+    pub neurons_potential: Scalar,
+    pub neurons_potential_min: Scalar,
+    pub neurons_potential_max: Scalar,
+    pub impulses_potential: Scalar,
+    pub impulses_potential_min: Scalar,
+    pub impulses_potential_max: Scalar,
+    pub all_potential: Scalar,
+    pub all_potential_min: Scalar,
+    pub all_potential_max: Scalar,
+    pub incoming_neuron_connections_min: usize,
+    pub incoming_neuron_connections_max: usize,
+    pub outgoing_neuron_connections_min: usize,
+    pub outgoing_neuron_connections_max: usize,
+    pub synapses_receptors_min: Scalar,
+    pub synapses_receptors_max: Scalar,
+}
+
+impl Into<BrainActivityStats> for PsycheBrainActivityStats {
+    fn into(self) -> BrainActivityStats {
+        BrainActivityStats {
+            neurons_count: self.neurons_count,
+            synapses_count: self.synapses_count,
+            impulses_count: self.impulses_count,
+            neurons_potential: self.neurons_potential.0,
+            neurons_potential_min: self.neurons_potential.1.start,
+            neurons_potential_max: self.neurons_potential.1.end,
+            impulses_potential: self.impulses_potential.0,
+            impulses_potential_min: self.impulses_potential.1.start,
+            impulses_potential_max: self.impulses_potential.1.end,
+            all_potential: self.all_potential.0,
+            all_potential_min: self.all_potential.1.start,
+            all_potential_max: self.all_potential.1.end,
+            incoming_neuron_connections_min: self.incoming_neuron_connections.start,
+            incoming_neuron_connections_max: self.incoming_neuron_connections.end,
+            outgoing_neuron_connections_min: self.outgoing_neuron_connections.start,
+            outgoing_neuron_connections_max: self.outgoing_neuron_connections.end,
+            synapses_receptors_min: self.synapses_receptors.start,
+            synapses_receptors_max: self.synapses_receptors.end,
         }
     }
 }
@@ -440,6 +487,9 @@ pub unsafe extern "C" fn psyche_brain_effector_potential_release(
     uid: UID,
     out_result: *mut Scalar,
 ) -> bool {
+    if out_result.is_null() {
+        return false;
+    }
     if let Some(brain) = BRAINS.lock().unwrap().get_mut(&handle) {
         if let Ok(potential) = brain.effector_potential_release(uid.into_id()) {
             *out_result = potential;
@@ -496,6 +546,50 @@ pub unsafe extern "C" fn psyche_offspring_merged(
         }
     }
     0
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn psyche_get_brain_synapses_count(
+    handle: Handle,
+    out_result: *mut usize,
+) -> bool {
+    if out_result.is_null() {
+        return false;
+    }
+    if let Some(brain) = BRAINS.lock().unwrap().get_mut(&handle) {
+        *out_result = brain.synapses_count();
+        true
+    } else {
+        false
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn psyche_ignite_random_brain_synapses(
+    handle: Handle,
+    count: usize,
+    potential_min: Scalar,
+    potential_max: Scalar,
+) -> bool {
+    if let Some(brain) = BRAINS.lock().unwrap().get_mut(&handle) {
+        brain.ignite_random_synapses(count, potential_min..potential_max);
+        true
+    } else {
+        false
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn psyche_brain_activity_stats(
+    handle: Handle,
+    out_result: *mut BrainActivityStats,
+) -> bool {
+    if let Some(brain) = BRAINS.lock().unwrap().get_mut(&handle) {
+        *out_result = brain.build_activity_stats().into();
+        true
+    } else {
+        false
+    }
 }
 
 fn bytes_from_raw(source: *const libc::c_uchar, size: usize) -> Vec<u8> {

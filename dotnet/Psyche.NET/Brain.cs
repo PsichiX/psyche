@@ -188,6 +188,31 @@ namespace Psyche
             return null;
         }
 
+        public bool GetSynapsesCount(out UIntPtr count)
+        {
+            var result = UIntPtr.Zero;
+            if (NAPI.GetBrainSynapsesCount(handle, ref result))
+            {
+                count = result;
+                return true;
+            }
+            count = result;
+            return false;
+        }
+
+        public bool IgniteRandomSynapses(UIntPtr count, double potentialMin, double potentialMax)
+        {
+            return NAPI.IgniteRandomBrainSynapses(handle, count, potentialMin, potentialMax);
+        }
+
+        public bool GetActivityStats(out NAPI.BrainActivityStats outResult)
+        {
+            var stats = new NAPI.BrainActivityStats();
+            var status = NAPI.GetBrainActivityStats(handle, ref stats);
+            outResult = stats;
+            return status;
+        }
+
         private NAPI.UID[] MakeUids(IntPtr array, UIntPtr count)
         {
             var result = new NAPI.UID[(uint)count];

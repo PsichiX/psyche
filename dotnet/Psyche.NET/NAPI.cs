@@ -117,6 +117,29 @@ namespace Psyche
             public UIntPtr MaxConnectingTries;
         }
 
+        [StructLayout(LayoutKind.Sequential)]
+        public struct BrainActivityStats
+        {
+            public UIntPtr NeuronsCount;
+            public UIntPtr SynapsesCount;
+            public UIntPtr ImpulsesCount;
+            public double NeuronsPotential;
+            public double NeuronsPotentialMin;
+            public double NeuronsPotentialMax;
+            public double ImpulsesPotential;
+            public double ImpulsesPotentialMin;
+            public double ImpulsesPotentialMax;
+            public double AllPotential;
+            public double AllPotentialMin;
+            public double AllPotentialMax;
+            public UIntPtr IncomingNeuronConnectionsMin;
+            public UIntPtr IncomingNeuronConnectionsMax;
+            public UIntPtr OutgoingNeuronConnectionsMin;
+            public UIntPtr OutgoingNeuronConnectionsMax;
+            public double SynapsesReceptorsMin;
+            public double SynapsesReceptorsMax;
+        }
+
         [DllImport(LibName, CallingConvention = LibCall, EntryPoint = "psyche_default_brain_builder_config", CharSet = CharSet.Ansi)]
         public extern static void DefaultBrainBuilderConfig(ref BrainBuilderConfig config);
 
@@ -249,6 +272,29 @@ namespace Psyche
             ref OffspringBuilderConfig config,
             UIntPtr handleA,
             UIntPtr handleB
+        );
+
+        [DllImport(LibName, CallingConvention = LibCall, EntryPoint = "psyche_get_brain_synapses_count", CharSet = CharSet.Ansi)]
+        [return: MarshalAs(UnmanagedType.I1)]
+        public extern static bool GetBrainSynapsesCount(
+            UIntPtr handle,
+            ref UIntPtr outResult
+        );
+
+        [DllImport(LibName, CallingConvention = LibCall, EntryPoint = "psyche_ignite_random_brain_synapses", CharSet = CharSet.Ansi)]
+        [return: MarshalAs(UnmanagedType.I1)]
+        public extern static bool IgniteRandomBrainSynapses(
+            UIntPtr handle,
+            UIntPtr count,
+            double potentialMin,
+            double potentialMax
+        );
+
+        [DllImport(LibName, CallingConvention = LibCall, EntryPoint = "psyche_brain_activity_stats", CharSet = CharSet.Ansi)]
+        [return: MarshalAs(UnmanagedType.I1)]
+        public extern static bool GetBrainActivityStats(
+            UIntPtr handle,
+            ref BrainActivityStats outResult
         );
     }
 }

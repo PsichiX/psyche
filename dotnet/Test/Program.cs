@@ -61,6 +61,12 @@ namespace Test
                     }
                 }
             }
+
+            brain.GetSynapsesCount(out var synapses);
+            brain.IgniteRandomSynapses((UIntPtr)((uint)synapses / 2), 1, 2);
+
+            brain.GetActivityStats(out var stats);
+
             Console.ReadKey();
         }
     }
