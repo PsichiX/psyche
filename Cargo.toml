@@ -14,6 +14,9 @@ exclude = [
   "cpp",
   "dotnet",
   "dist",
+  "build_all.sh",
+  "build_all.bat",
+  "publish.sh",
 ]
 
 [dependencies]
@@ -39,4 +42,7 @@ exclude = [
   "cpp",
   "dotnet",
   "dist",
+  "build_all.sh",
+  "build_all.bat",
+  "publish.sh",
 ]
