@@ -9,14 +9,11 @@ homepage = "https://github.com/PsichiX/psyche"
 repository = "https://github.com/PsichiX/psyche"
 documentation = "https://docs.rs/psyche"
 exclude = [
-  "demos",
-  "media",
-  "cpp",
-  "dotnet",
-  "dist",
-  "build_all.sh",
-  "build_all.bat",
-  "publish.sh",
+  "demos/**",
+  "media/**",
+  "cpp/**",
+  "dotnet/**",
+  "dist/**",
 ]
 
 [dependencies]
@@ -42,7 +39,4 @@ exclude = [
   "cpp",
   "dotnet",
   "dist",
-  "build_all.sh",
-  "build_all.bat",
-  "publish.sh",
 ]
