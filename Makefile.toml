@@ -1,7 +1,7 @@
 [tasks.all]
 dependencies = [
   "toolset",
-  # "demos",
+  "demos",
 ]
 
 [tasks.toolset]
