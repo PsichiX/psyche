@@ -1,5 +1,6 @@
 /dist
 /target
+/unity
 **/*.rs.bk
 Cargo.lock
 /*.sh

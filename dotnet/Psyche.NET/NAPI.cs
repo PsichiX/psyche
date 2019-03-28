@@ -30,6 +30,7 @@ namespace Psyche
         );
 
         [StructLayout(LayoutKind.Sequential)]
+        [Serializable]
         public struct UID
         {
             private readonly byte field0;
@@ -51,6 +52,7 @@ namespace Psyche
         }
 
         [StructLayout(LayoutKind.Sequential)]
+        [Serializable]
         public struct Opt<T> where T : struct
         {
             public bool HasValue => hasValue;
@@ -78,6 +80,7 @@ namespace Psyche
         }
 
         [StructLayout(LayoutKind.Sequential)]
+        [Serializable]
         public struct BrainBuilderConfig
         {
             public double PropagationSpeed;
@@ -104,6 +107,7 @@ namespace Psyche
         }
 
         [StructLayout(LayoutKind.Sequential)]
+        [Serializable]
         public struct OffspringBuilderConfig
         {
             public UIntPtr NewNeurons;
@@ -118,6 +122,7 @@ namespace Psyche
         }
 
         [StructLayout(LayoutKind.Sequential)]
+        [Serializable]
         public struct BrainActivityStats
         {
             public UIntPtr NeuronsCount;
@@ -140,11 +145,31 @@ namespace Psyche
             public double SynapsesReceptorsMax;
         }
 
+        [DllImport(LibName, CallingConvention = LibCall, EntryPoint = "psyche_brain_builder_to_string", CharSet = CharSet.Ansi)]
+        public extern static void BrainBuilderToString(
+            ref BrainBuilderConfig config,
+            [MarshalAs(UnmanagedType.FunctionPtr)]
+            OnResultString result,
+            IntPtr resultContext
+        );
+
+        [DllImport(LibName, CallingConvention = LibCall, EntryPoint = "psyche_offspring_builder_to_string", CharSet = CharSet.Ansi)]
+        public extern static void OffspringBuilderToString(
+            ref OffspringBuilderConfig config,
+            [MarshalAs(UnmanagedType.FunctionPtr)]
+            OnResultString result,
+            IntPtr resultContext
+        );
+
         [DllImport(LibName, CallingConvention = LibCall, EntryPoint = "psyche_default_brain_builder_config", CharSet = CharSet.Ansi)]
-        public extern static void DefaultBrainBuilderConfig(ref BrainBuilderConfig config);
+        public extern static void DefaultBrainBuilderConfig(
+            ref BrainBuilderConfig config
+        );
 
         [DllImport(LibName, CallingConvention = LibCall, EntryPoint = "psyche_default_offspring_builder_config", CharSet = CharSet.Ansi)]
-        public extern static void DefaultOffspringBuilderConfig(ref OffspringBuilderConfig config);
+        public extern static void DefaultOffspringBuilderConfig(
+            ref OffspringBuilderConfig config
+        );
 
         [DllImport(LibName, CallingConvention = LibCall, EntryPoint = "psyche_build_brain", CharSet = CharSet.Ansi)]
         public extern static UIntPtr BuildBrain(

@@ -38,6 +38,7 @@ impl UID {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct Opt<T> {
     pub has_value: bool,
     pub value: T,
@@ -80,6 +81,7 @@ impl<T> Opt<T> {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct BrainBuilderConfig {
     pub propagation_speed: Scalar,
     pub neuron_potential_decay: Scalar,
@@ -160,6 +162,7 @@ impl Default for BrainBuilderConfig {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct OffspringBuilderConfig {
     pub new_neurons: usize,
     pub new_connections: usize,
@@ -202,6 +205,7 @@ impl Default for OffspringBuilderConfig {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct BrainActivityStats {
     pub neurons_count: usize,
     pub synapses_count: usize,
@@ -245,6 +249,34 @@ impl Into<BrainActivityStats> for PsycheBrainActivityStats {
             synapses_receptors_min: self.synapses_receptors.start,
             synapses_receptors_max: self.synapses_receptors.end,
         }
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn psyche_brain_builder_to_string(
+    config: *const BrainBuilderConfig,
+    result: fn(*mut libc::c_void, *const libc::c_char),
+    result_context: *mut libc::c_void,
+) {
+    if config.is_null() || (result as *const libc::c_void).is_null() {
+        result(null_mut(), null());
+    } else {
+        let content = CString::new(format!("{:#?}", *config)).unwrap();
+        result(result_context, content.as_ptr());
+    }
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn psyche_offspring_builder_to_string(
+    config: *const OffspringBuilderConfig,
+    result: fn(*mut libc::c_void, *const libc::c_char),
+    result_context: *mut libc::c_void,
+) {
+    if config.is_null() || (result as *const libc::c_void).is_null() {
+        result(null_mut(), null());
+    } else {
+        let content = CString::new(format!("{:#?}", *config)).unwrap();
+        result(result_context, content.as_ptr());
     }
 }
 
@@ -313,6 +345,9 @@ pub extern "C" fn psyche_serialize_bytes_brain(
     result: fn(*mut libc::c_void, *const libc::c_uchar, usize),
     result_context: *mut libc::c_void,
 ) -> bool {
+    if (result as *const libc::c_void).is_null() {
+        return false;
+    }
     if let Some(brain) = BRAINS.lock().unwrap().get(&handle) {
         if let Ok(bytes) = brain_to_bytes(brain) {
             result(result_context, bytes.as_ptr(), bytes.len());
@@ -330,6 +365,9 @@ pub extern "C" fn psyche_serialize_json_brain(
     result: fn(*mut libc::c_void, *const libc::c_char),
     result_context: *mut libc::c_void,
 ) -> bool {
+    if (result as *const libc::c_void).is_null() {
+        return false;
+    }
     if let Some(brain) = BRAINS.lock().unwrap().get(&handle) {
         if let Ok(json) = brain_to_json(brain, pretty) {
             let json = CString::new(json).unwrap();
@@ -347,6 +385,9 @@ pub extern "C" fn psyche_serialize_yaml_brain(
     result: fn(*mut libc::c_void, *const libc::c_char),
     result_context: *mut libc::c_void,
 ) -> bool {
+    if (result as *const libc::c_void).is_null() {
+        return false;
+    }
     if let Some(brain) = BRAINS.lock().unwrap().get(&handle) {
         if let Ok(yaml) = brain_to_yaml(brain) {
             let yaml = CString::new(yaml).unwrap();
@@ -434,6 +475,9 @@ pub extern "C" fn psyche_brain_get_sensors(
     result: fn(*mut libc::c_void, *const UID, usize),
     result_context: *mut libc::c_void,
 ) -> bool {
+    if (result as *const libc::c_void).is_null() {
+        return false;
+    }
     if let Some(brain) = BRAINS.lock().unwrap().get(&handle) {
         let uids = brain
             .get_sensors()
@@ -453,6 +497,9 @@ pub extern "C" fn psyche_brain_get_effectors(
     result: fn(*mut libc::c_void, *const UID, usize),
     result_context: *mut libc::c_void,
 ) -> bool {
+    if (result as *const libc::c_void).is_null() {
+        return false;
+    }
     if let Some(brain) = BRAINS.lock().unwrap().get(&handle) {
         let uids = brain
             .get_effectors()

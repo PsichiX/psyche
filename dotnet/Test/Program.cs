@@ -8,7 +8,12 @@ namespace Test
     {
         static void Main(string[] args)
         {
-            File.Copy("../../../../target/debug/psyche_capi.dll", "psyche_capi.dll", true);
+            Console.WriteLine(Environment.CurrentDirectory);
+#if DEBUG
+            File.Copy("../../../../target/debug/psyche_capi.dll", "./psyche_capi.dll", true);
+#else
+            File.Copy("../../../../target/release/psyche_capi.dll", "./psyche_capi.dll", true);
+#endif
 
             var brainConfig = new NAPI.BrainBuilderConfig();
             NAPI.DefaultBrainBuilderConfig(ref brainConfig);
@@ -24,6 +29,8 @@ namespace Test
             brainConfig.Radius = 50;
             brainConfig.Sensors = (UIntPtr)50;
             brainConfig.Effectors = (UIntPtr)25;
+
+            NAPI.BrainBuilderToString(ref brainConfig, (context, content) => Console.WriteLine(content), IntPtr.Zero);
 
             var brain = new Brain(ref brainConfig);
             var sensors = brain.GetSensors();

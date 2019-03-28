@@ -1,7 +1,7 @@
 [tasks.all]
 dependencies = [
   "toolset",
-  "demos",
+  # "demos",
 ]
 
 [tasks.toolset]
@@ -12,6 +12,7 @@ dependencies = [
   "build-capi",
   "build-dotnet-wrapper",
   "toolset-post-produce",
+  # "unity-package",
   "archive-toolset",
 ]
 
@@ -161,6 +162,40 @@ script = [
   xcopy "%CD%"\dotnet\Psyche.NET\bin\Release\netstandard2.0 "%CD%"\dist\toolset\lib\release\
   '''
 ]
+
+# [tasks.unity-package]
+# dependencies = [
+#   "update-unity-dependencies",
+#   "build-unity-package",
+# ]
+#
+# [tasks.update-unity-dependencies]
+# script = [
+#   '''
+#   echo "* update unity dependencies"
+#   cp -f target/release/psyche_capi.so unity/Psyche.Unity/Assets/Psyche/Plugins/psyche_capi.so
+#   cp -f dotnet/Psyche.NET/bin/Release/netstandard2.0/Psyche.NET.dll unity/Psyche.Unity/Assets/Psyche/Plugins/Psyche.NET.dll
+#   '''
+# ]
+#
+# [tasks.update-unity-dependencies.windows]
+# script = [
+#   '''
+#   echo "* update unity dependencies"
+#   copy "%CD%"\target\release\psyche_capi.dll "%CD%"\unity\Psyche.Unity\Assets\Psyche\Plugins\psyche_capi.dll
+#   copy "%CD%"\dotnet\Psyche.NET\bin\Release\netstandard2.0\Psyche.NET.dll "%CD%"\unity\Psyche.Unity\Assets\Psyche\Plugins\Psyche.NET.dll
+#   '''
+# ]
+#
+# [tasks.build-unity-package]
+# script = [
+#   '''$UNITY_BIN -projectPath "unity/Psyche.Unity/" -quit -batchmode -exportPackage Assets/Psyche ../../dist/toolset/psyche.unitypackage'''
+# ]
+#
+# [tasks.build-unity-package.windows]
+# script = [
+#   '''%UNITY_BIN% -projectPath "%CD%\unity\Psyche.Unity\" -quit -batchmode -exportPackage Assets\Psyche ..\..\dist\toolset\psyche.unitypackage'''
+# ]
 
 [tasks.demos]
 dependencies = [

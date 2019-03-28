@@ -15,6 +15,10 @@ void onGetYaml(void * context, const char* content) {
 	result->assign(content);
 }
 
+void onPrint(void * context, const char* content) {
+	std::cout << content << std::endl;
+}
+
 int main() {
 	BrainBuilderConfig brainConfig;
 	psyche_default_brain_builder_config(&brainConfig);
@@ -32,6 +36,8 @@ int main() {
 	brainConfig.radius = 50;
 	brainConfig.sensors = 50;
 	brainConfig.effectors = 25;
+
+	psyche_brain_builder_to_string(&brainConfig, onPrint, nullptr);
 
 	auto brain = psyche_build_brain(&brainConfig);
 	std::vector<UID> sensors;
