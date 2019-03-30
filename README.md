@@ -25,18 +25,19 @@ plugin and [**Amethyst** engine](https://www.amethyst.rs/) integration
 crate.
 
 ## Toolset modules
-1. **Core** - defines brain: neurons, connections between them, production of
-offsprings by evolution and all processing that makes brain functioning;
-1. **Serde** - serialization and deserialization brains into different storing
-data formats: Binary, JSON and YAML;
-1. **Host** - for now does nothing but it will gives ability to put brain in
-host body;
-1. **Graphics** - produces Waveform OBJ graphics data that may be used to
-visualize brain activity;
-1. **Simulator CLI app** - CLI application that simulate brain activity step by
-step and for each step it produces brain activity frames data as files ready to
-use in external applications such as Houdini for visualizations or any analizer
-application.
+1. [**Core**](psyche-core) - defines brain: neurons, connections between them,
+production of offsprings by evolution and all processing that makes brain
+functioning;
+1. [**Serde**](psyche-serde) - serialization and deserialization brains into
+different storing data formats: Binary, JSON and YAML;
+1. [**Host**](psyche-host) - for now does nothing but it will gives ability to
+put brain in host body;
+1. [**Graphics**](psyche-graphics) - produces Waveform OBJ graphics data that
+may be used to visualize brain activity;
+1. [**Simulator CLI app**](psyche-simulator-cli) - CLI application that simulate
+brain activity step by step and for each step it produces brain activity frames
+data as files ready to use in external applications such as Houdini for
+visualizations or any analizer application.
 
 ## Demos
 
