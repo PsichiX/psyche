@@ -1,4 +1,4 @@
-![Logo](https://raw.githubusercontent.com/PsichiX/psyche/master/media/psyche-logo-2-light.png)
+![Logo](https://raw.githubusercontent.com/PsichiX/psyche/master/media/psyche-logo-light.png)
 # Psyche AI Toolset
 
 ## General idea
