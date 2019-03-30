@@ -28,6 +28,7 @@ frameworks.
 - TODO: [**Godot** engine](https://godotengine.org/) plugin (there is a bug to
   fix on the integration side);
 - TODO: [**Amethyst** engine](https://www.amethyst.rs/) integration crate.
+- TODO: [**Game Maker** engine](https://www.yoyogames.com/gamemaker) plugin.
 
 ## Toolset modules
 - [**Core**](https://github.com/PsichiX/psyche/psyche-core) - defines brain:
