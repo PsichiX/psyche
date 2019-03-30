@@ -16,29 +16,34 @@ You can read more about Practopoiesis Theory here:
 All toolset modules are written in [**Rust** programming language](https://www.rust-lang.org/)
 (a multi-paradigm systems programming language focused on safety, especially
 safe concurrency) and is available on [crates.io](https://crates.io/crates/psyche)
-as Rust Crate ready to be your project dependency. Moreover, Psyche toolset
-provides **FFI** (Foreign Function Interface) libraries for **C** and **C++**
-languages, and FFI wrapper for **C#** language. There are plans for
-[**Unity 3D** engine](https://unity.com/) plugin but first there is a bug to fix
-on the integration side. There are also plans for [**Godot** engine](https://godotengine.org/)
-plugin and [**Amethyst** engine](https://www.amethyst.rs/) integration
-crate.
+as Rust Crate ready to be your project dependency.
+
+## Foreign Function Interface
+Psyche toolset provides **FFI** libraries and wrappers for many languages and
+frameworks.
+- **C** and **C++** headers with native static and dynamic libraries;
+- **C#** wrapper;
+- TODO: [**Unity 3D** engine](https://unity.com/) plugin (there is a bug to fix
+  on the integration side);
+- TODO: [**Godot** engine](https://godotengine.org/) plugin (there is a bug to
+  fix on the integration side);
+- TODO: [**Amethyst** engine](https://www.amethyst.rs/) integration crate.
 
 ## Toolset modules
-1. [**Core**](https://github.com/PsichiX/psyche/psyche-core) - defines brain:
-neurons, connections between them, production of offsprings by evolution and all
-processing that makes brain functioning;
-1. [**Serde**](https://github.com/PsichiX/psyche/psyche-serde) - serialization
-and deserialization brains into different storing data formats: Binary, JSON and
-YAML;
-1. [**Host**](https://github.com/PsichiX/psyche/psyche-host) - for now does
-nothing but it will gives ability to put brain in host body;
-1. [**Graphics**](https://github.com/PsichiX/psyche/psyche-graphics) - produces
-Waveform OBJ graphics data that may be used to visualize brain activity;
-1. [**Simulator CLI app**](https://github.com/PsichiX/psyche/psyche-simulator-cli) - CLI
-application that simulate brain activity step by step and for each step it
-produces brain activity frames data as files ready to use in external
-applications such as Houdini for visualizations or any analizer application.
+- [**Core**](https://github.com/PsichiX/psyche/psyche-core) - defines brain:
+  neurons, connections between them, production of offsprings by evolution and
+  all processing that makes brain functioning;
+- [**Serde**](https://github.com/PsichiX/psyche/psyche-serde) - serialization
+  and deserialization brains into different storing data formats: Binary, JSON
+  and YAML;
+- [**Host**](https://github.com/PsichiX/psyche/psyche-host) - for now does
+  nothing but it will gives ability to put brain in host body;
+- [**Graphics**](https://github.com/PsichiX/psyche/psyche-graphics) - produces
+  Waveform OBJ graphics data that may be used to visualize brain activity;
+- [**Simulator CLI app**](https://github.com/PsichiX/psyche/psyche-simulator-cli) - CLI
+  application that simulate brain activity step by step and for each step it
+  produces brain activity frames data as files ready to use in external
+  applications such as Houdini for visualizations or any analizer application.
 
 ## Demos
 
