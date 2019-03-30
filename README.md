@@ -1,4 +1,4 @@
-![Logo](media/psyche-logo-2-light.png)
+![Logo](https://raw.githubusercontent.com/PsichiX/psyche/master/media/psyche-logo-2-light.png)
 # Psyche AI Toolset
 
 ## General idea
@@ -25,34 +25,35 @@ plugin and [**Amethyst** engine](https://www.amethyst.rs/) integration
 crate.
 
 ## Toolset modules
-1. [**Core**](psyche-core) - defines brain: neurons, connections between them,
-production of offsprings by evolution and all processing that makes brain
-functioning;
-1. [**Serde**](psyche-serde) - serialization and deserialization brains into
-different storing data formats: Binary, JSON and YAML;
-1. [**Host**](psyche-host) - for now does nothing but it will gives ability to
-put brain in host body;
-1. [**Graphics**](psyche-graphics) - produces Waveform OBJ graphics data that
-may be used to visualize brain activity;
-1. [**Simulator CLI app**](psyche-simulator-cli) - CLI application that simulate
-brain activity step by step and for each step it produces brain activity frames
-data as files ready to use in external applications such as Houdini for
-visualizations or any analizer application.
+1. [**Core**](https://github.com/PsichiX/psyche/psyche-core) - defines brain:
+neurons, connections between them, production of offsprings by evolution and all
+processing that makes brain functioning;
+1. [**Serde**](https://github.com/PsichiX/psyche/psyche-serde) - serialization
+and deserialization brains into different storing data formats: Binary, JSON and
+YAML;
+1. [**Host**](https://github.com/PsichiX/psyche/psyche-host) - for now does
+nothing but it will gives ability to put brain in host body;
+1. [**Graphics**](https://github.com/PsichiX/psyche/psyche-graphics) - produces
+Waveform OBJ graphics data that may be used to visualize brain activity;
+1. [**Simulator CLI app**](https://github.com/PsichiX/psyche/psyche-simulator-cli) - CLI
+application that simulate brain activity step by step and for each step it
+produces brain activity frames data as files ready to use in external
+applications such as Houdini for visualizations or any analizer application.
 
 ## Demos
 
-#### [Brain activity visualizer](demos/src/brain-activity)
+#### [Brain activity visualizer](https://github.com/PsichiX/psyche/demos/src/brain-activity)
 Every blue line is a connection between two neurons and every white dot is a
 signal traveling through neural network.
 
-[![psyche-demo-brain-activity](media/psyche-demo-brain-activity.gif)](media/psyche-demo-brain-activity.mp4)
+[![psyche-demo-brain-activity](https://raw.githubusercontent.com/PsichiX/psyche/master/media/psyche-demo-brain-activity.gif)](https://raw.githubusercontent.com/PsichiX/psyche/master/media/psyche-demo-brain-activity.mp4)
 
-#### [Spores in fluid environment](demos/src/spore)
+#### [Spores in fluid environment](https://github.com/PsichiX/psyche/demos/src/spore)
 Each spore has its own brain connected to body sensors (smell) and motors (legs)
 and by that it tries to find and eat food portions left in water. You can also
 manipulate environment by producing fluid currents with mouse dragging.
 
-[![psyche-demo-spore](media/psyche-demo-spore.gif)](../media/psyche-demo-spore.mp4)
+[![psyche-demo-spore](https://raw.githubusercontent.com/PsichiX/psyche/master/media/psyche-demo-spore.gif)](https://raw.githubusercontent.com/PsichiX/psyche/master/media/psyche-demo-spore.mp4)
 
 ## Usage
 [![Docs.rs](https://docs.rs/psyche/badge.svg)](https://docs.rs/psyche)
