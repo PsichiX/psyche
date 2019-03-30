@@ -1,4 +1,5 @@
-# Psyche AI Toolset demos
+![Logo](../media/psyche-logo-2-light.png)
+# Demos
 
 ## Brain Activity Visualizer
 [![psyche-demo-brain-activity](../media/psyche-demo-brain-activity.gif)](../media/psyche-demo-brain-activity.mp4)
