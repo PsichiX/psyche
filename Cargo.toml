@@ -1,6 +1,6 @@
 [package]
 name = "psyche"
-version = "0.2.15"
+version = "0.2.16"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 edition = "2018"
 description = "Psyche AI Toolset"
@@ -15,6 +15,7 @@ exclude = [
   "dotnet/**",
   "dist/**",
   "unity/**",
+  "godot/**",
 ]
 
 [dependencies]
@@ -41,4 +42,5 @@ exclude = [
   "dotnet",
   "dist",
   "unity",
+  "godot",
 ]

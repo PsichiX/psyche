@@ -1,6 +1,6 @@
 [package]
 name = "psyche-utils"
-version = "0.2.15"
+version = "0.2.16"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 edition = "2018"
 description = "Utils module for Psyche AI Toolset"
