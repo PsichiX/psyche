@@ -23,11 +23,11 @@ Psyche toolset provides **FFI** libraries and wrappers for many languages and
 frameworks.
 - **C** and **C++** headers with native static and dynamic libraries;
 - **C#** wrapper;
+- [**Amethyst** engine](https://www.amethyst.rs/) integration crate.
 - TODO: [**Unity 3D** engine](https://unity.com/) plugin (there is a bug to fix
   on the integration side);
 - TODO: [**Godot** engine](https://godotengine.org/) plugin (there is a bug to
   fix on the integration side);
-- TODO: [**Amethyst** engine](https://www.amethyst.rs/) integration crate.
 - TODO: [**Game Maker** engine](https://www.yoyogames.com/gamemaker) plugin.
 
 ## Toolset modules
