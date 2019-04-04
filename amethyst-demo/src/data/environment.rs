@@ -1,21 +1,4 @@
-use amethyst::{
-    core::transform::Transform,
-    ecs::{Component, DenseVecStorage, Join, ReadStorage, System, Write},
-};
-
-pub struct ObstacleComponent;
-
-impl Component for ObstacleComponent {
-    type Storage = DenseVecStorage<Self>;
-}
-
-pub struct TargetComponent;
-
-impl Component for TargetComponent {
-    type Storage = DenseVecStorage<Self>;
-}
-
-pub type Vector = (f32, f32, f32);
+use crate::Vector;
 
 #[derive(Debug, Default)]
 pub struct EnvironmentData {
@@ -53,37 +36,5 @@ impl EnvironmentData {
                 Some((dot * (1.0 - len / distance)).max(0.0))
             })
             .sum()
-    }
-}
-
-pub struct EnvironmentSystem;
-
-impl<'s> System<'s> for EnvironmentSystem {
-    type SystemData = (
-        ReadStorage<'s, ObstacleComponent>,
-        ReadStorage<'s, TargetComponent>,
-        ReadStorage<'s, Transform>,
-        Write<'s, EnvironmentData>,
-    );
-
-    fn run(&mut self, (obstacles, targets, transforms, mut data): Self::SystemData) {
-        data.set_obstacles(
-            (&obstacles, &transforms)
-                .join()
-                .map(|(_, transform)| {
-                    let t = transform.translation();
-                    (t.x, t.y, t.z)
-                })
-                .collect(),
-        );
-        data.set_targets(
-            (&targets, &transforms)
-                .join()
-                .map(|(_, transform)| {
-                    let t = transform.translation();
-                    (t.x, t.y, t.z)
-                })
-                .collect(),
-        );
     }
 }

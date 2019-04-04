@@ -19,7 +19,11 @@ impl Component for BrainComponent {
 }
 
 impl BrainComponent {
-    pub fn new(builder: BrainBuilder) -> Self {
+    pub fn new(brain: Brain) -> Self {
+        Self { brain }
+    }
+
+    pub fn with_builder(builder: BrainBuilder) -> Self {
         Self {
             brain: builder.build(),
         }
