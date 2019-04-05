@@ -6,7 +6,7 @@ use amethyst::{
 use psyche_amethyst::BrainComponent;
 use std::f32::consts::PI;
 
-const SENSOR_DISTANCE: f32 = 1000.0;
+const SENSOR_DISTANCE: f32 = 1000.0 * 0.25;
 const SIDE_SIGHT: f32 = PI * 0.25;
 
 pub struct ShibaSystem;

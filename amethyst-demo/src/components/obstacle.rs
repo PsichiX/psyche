@@ -1,7 +1,8 @@
-use amethyst::ecs::{Component, DenseVecStorage};
+use amethyst::ecs::{Component, NullStorage};
 
+#[derive(Default)]
 pub struct ObstacleComponent;
 
 impl Component for ObstacleComponent {
-    type Storage = DenseVecStorage<Self>;
+    type Storage = NullStorage<Self>;
 }

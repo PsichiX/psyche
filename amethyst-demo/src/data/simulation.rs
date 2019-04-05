@@ -1,8 +1,12 @@
-use psyche::core::{brain::Brain, brain_builder::BrainBuilder, config::Config as BrainConfig};
+use psyche::core::{
+    brain::Brain, brain_builder::BrainBuilder, config::Config as BrainConfig,
+    offspring_builder::OffspringBuilder,
+};
 
 #[derive(Debug)]
 pub struct SimulationData {
-    pub brain: Brain,
+    pub brain_scored: (Brain, f32),
+    pub last_scored: Option<(Brain, f32)>,
 }
 
 impl Default for SimulationData {
@@ -22,8 +26,37 @@ impl Default for SimulationData {
             .radius(30.0)
             .sensors(4)
             .effectors(2);
+
         Self {
-            brain: brain_builder.build(),
+            brain_scored: (brain_builder.build(), 0.0),
+            last_scored: None,
+        }
+    }
+}
+
+impl SimulationData {
+    pub fn mutate(&mut self, score: f32) -> bool {
+        let offspring_builder = OffspringBuilder::new()
+            .new_neurons(2)
+            .new_connections(8)
+            .radius(30.0)
+            .min_neurogenesis_range(5.0)
+            .max_neurogenesis_range(15.0)
+            .new_sensors(0)
+            .new_effectors(0);
+
+        if score > self.brain_scored.1 || self.last_scored.is_none() {
+            self.last_scored = Some(self.brain_scored.clone());
+            self.brain_scored = (offspring_builder.build_mutated(&self.brain_scored.0), score);
+            true
+        } else {
+            if let Some(last_scored) = &self.last_scored {
+                self.brain_scored = (
+                    offspring_builder.build_mutated(&last_scored.0),
+                    last_scored.1,
+                );
+            }
+            false
         }
     }
 }
