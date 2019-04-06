@@ -27,6 +27,8 @@ command = "cargo"
 args = [
   "build",
   "--all",
+  "--features",
+  "parallel",
 ]
 
 [tasks.build-release]
@@ -35,6 +37,8 @@ args = [
   "build",
   "--all",
   "--release",
+  "--features",
+  "parallel",
 ]
 
 [tasks.build-capi-h]
