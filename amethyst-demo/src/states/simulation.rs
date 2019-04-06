@@ -1,6 +1,6 @@
 use crate::{
     components::{obstacle::ObstacleComponent, shiba::ShibaComponent, target::TargetComponent},
-    data::{asset_database::AssetDatabase, simulation::SimulationData},
+    data::{asset_database::AssetDatabase, settings::SettingsData, simulation::SimulationData},
 };
 use amethyst::{
     core::{timing::Time, transform::Transform},
@@ -10,6 +10,10 @@ use amethyst::{
     renderer::{Camera, Projection, SpriteRender, VirtualKeyCode},
 };
 use psyche_amethyst::BrainComponent;
+use std::{
+    fs::{read, write},
+    str::from_utf8,
+};
 
 const MAX_SESSION_TIME: f32 = 15.0;
 const MAX_DISTANCE: f32 = 1000.0 * 0.25;
@@ -37,6 +41,19 @@ impl Default for SimulationState {
 impl SimpleState for SimulationState {
     fn on_start(&mut self, data: StateData<'_, GameData<'_, '_>>) {
         let world = data.world;
+        {
+            let snapshot_path = { world.read_resource::<SettingsData>().snapshot_path.clone() };
+            if let Some(snapshot_path) = snapshot_path {
+                if let Ok(bytes) = read(&snapshot_path) {
+                    if let Ok(json) = from_utf8(&bytes) {
+                        if let Ok(data) = serde_json::from_str(json) {
+                            *world.write_resource::<SimulationData>() = data;
+                        }
+                    }
+                }
+            }
+        }
+
         let sprite_sheet_handle = {
             let asset_base = world.read_resource::<AssetDatabase>();
             asset_base.sprite_sheet.clone().unwrap()
@@ -147,11 +164,22 @@ impl SimpleState for SimulationState {
 
     fn handle_event(
         &mut self,
-        _data: StateData<'_, GameData<'_, '_>>,
+        data: StateData<'_, GameData<'_, '_>>,
         event: StateEvent,
     ) -> SimpleTrans {
         if let StateEvent::Window(event) = &event {
             if is_key_down(&event, VirtualKeyCode::Escape) {
+                let world = data.world;
+                {
+                    let snapshot_path =
+                        { world.read_resource::<SettingsData>().snapshot_path.clone() };
+                    if let Some(snapshot_path) = snapshot_path {
+                        let data: &SimulationData = &world.read_resource();
+                        if let Ok(json) = serde_json::to_string_pretty(data) {
+                            drop(write(&snapshot_path, json));
+                        }
+                    }
+                }
                 return Trans::Quit;
             }
         }

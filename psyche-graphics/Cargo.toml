@@ -1,6 +1,6 @@
 [package]
 name = "psyche-graphics"
-version = "0.2.17"
+version = "0.2.18"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 edition = "2018"
 description = "Graphics generation module for Psyche AI Toolset"
@@ -8,6 +8,10 @@ license = "MIT"
 homepage = "https://github.com/PsichiX/psyche"
 repository = "https://github.com/PsichiX/psyche"
 documentation = "https://docs.rs/psyche-graphics"
+
+[features]
+# default = ["parallel"]
+parallel = ["psyche-core/parallel"]
 
 [dependencies]
 psyche-core = { version = "0.2", path = "../psyche-core" }

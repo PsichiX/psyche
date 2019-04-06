@@ -1,6 +1,6 @@
 [package]
 name = "psyche-simulator-cli"
-version = "0.2.17"
+version = "0.2.18"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 edition = "2018"
 description = "CLI simulator for Psyche AI Toolset"
@@ -14,7 +14,7 @@ name = "psysim"
 path = "src/main.rs"
 
 [dependencies]
-psyche = { version = "0.2", path = ".." }
+psyche = { version = "0.2", path = "..", features = ["parallel"] }
 clap = "2.32"
 rand = "0.5"
 serde = { version = "1.0", features = ["derive"] }

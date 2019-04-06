@@ -1,6 +1,7 @@
 extern crate amethyst;
 extern crate psyche;
 extern crate psyche_amethyst;
+extern crate serde_json;
 
 mod components;
 mod data;
@@ -8,6 +9,7 @@ mod states;
 mod systems;
 
 use crate::{
+    data::settings::SettingsData,
     states::loading::LoadingState,
     systems::{environment::EnvironmentSystem, shiba::ShibaSystem},
 };
@@ -23,6 +25,7 @@ use amethyst::{
     ui::{DrawUi, UiBundle},
     utils::application_root_dir,
 };
+use clap::{App, Arg};
 use psyche_amethyst::BrainBundle;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -40,12 +43,28 @@ impl<'a, 'b> SystemBundle<'a, 'b> for GameBundle {
 }
 
 fn main() -> amethyst::Result<()> {
+    let matches = App::new("Amethyst Demo")
+        .version(env!("CARGO_PKG_VERSION"))
+        .author(env!("CARGO_PKG_AUTHORS"))
+        .about("Amethyst Demo")
+        .arg(
+            Arg::with_name("snapshot")
+                .short("s")
+                .long("snapshot")
+                .value_name("FILE")
+                .help("Snapshot file")
+                .takes_value(true)
+                .required(false),
+        )
+        .get_matches();
+
     // amethyst::start_logger(Default::default());
 
     let app_root: PathBuf = application_root_dir().into();
     let display_config_path = app_root.join("assets/display.ron");
     // let key_bindings_path = app_root.join("resources/input.ron");
     let assets_dir = app_root.join("assets/");
+    let snapshot_path = matches.value_of("snapshot").map(|v| v.to_owned());
 
     let config = DisplayConfig::load(&display_config_path);
     let pipe = Pipeline::build().with_stage(
@@ -65,6 +84,7 @@ fn main() -> amethyst::Result<()> {
         .with_bundle(RenderBundle::new(pipe, Some(config)).with_sprite_sheet_processor())?
         .with_bundle(GameBundle)?;
     let mut game = Application::build(assets_dir, LoadingState)?
+        .with_resource(SettingsData { snapshot_path })
         .with_frame_limit(
             FrameRateLimitStrategy::SleepAndYield(Duration::from_millis(2)),
             144,

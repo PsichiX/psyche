@@ -1,6 +1,6 @@
 [package]
 name = "psyche-capi"
-version = "0.2.17"
+version = "0.2.18"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 edition = "2018"
 description = "C API module for Psyche AI Toolset"
@@ -10,7 +10,7 @@ repository = "https://github.com/PsichiX/psyche"
 documentation = "https://docs.rs/psyche-capi"
 
 [dependencies]
-psyche = { version = "0.2", path = ".." }
+psyche = { version = "0.2", path = "..", features = ["parallel"] }
 lazy_static = "1.2"
 libc = "0.2"
 

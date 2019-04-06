@@ -6,9 +6,36 @@ use crate::neuron::{Impulse, Neuron, NeuronID, Position, Synapse};
 use crate::sensor::{Sensor, SensorID};
 use crate::Scalar;
 use rand::{thread_rng, Rng};
+#[cfg(feature = "parallel")]
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::ops::Range;
+
+#[cfg(feature = "parallel")]
+macro_rules! iter {
+    ($v:expr) => {
+        $v.par_iter()
+    };
+}
+#[cfg(not(feature = "parallel"))]
+macro_rules! iter {
+    ($v:expr) => {
+        $v.iter()
+    };
+}
+
+#[cfg(feature = "parallel")]
+macro_rules! iter_mut {
+    ($v:expr) => {
+        $v.par_iter_mut()
+    };
+}
+#[cfg(not(feature = "parallel"))]
+macro_rules! iter_mut {
+    ($v:expr) => {
+        $v.iter_mut()
+    };
+}
 
 pub mod activity {
     pub const NONE: usize = 0;
@@ -91,55 +118,65 @@ impl Brain {
 
     pub fn duplicate(&self) -> Self {
         let id = Default::default();
-        let neuron_indices = self.neurons.par_iter().map(|n| n.id()).collect::<Vec<_>>();
-        let neurons = self
-            .neurons
-            .par_iter()
+        let neuron_indices = iter!(self.neurons).map(|n| n.id()).collect::<Vec<_>>();
+        let neurons = iter!(self.neurons)
             .map(|n| Neuron::new(id, n.position()))
             .collect::<Vec<_>>();
-        let synapses = self
-            .synapses
-            .par_iter()
-            .map(|s| Synapse {
-                source: neurons[neuron_indices
+        let synapses = iter!(self.synapses)
+            .map(|s| {
+                #[cfg(feature = "parallel")]
+                let sindex = neuron_indices
                     .par_iter()
                     .position_any(|n| *n == s.source)
-                    .unwrap()]
-                .id(),
-                target: neurons[neuron_indices
+                    .unwrap();
+                #[cfg(not(feature = "parallel"))]
+                let sindex = neuron_indices.iter().position(|n| *n == s.source).unwrap();
+                #[cfg(feature = "parallel")]
+                let nindex = neuron_indices
                     .par_iter()
                     .position_any(|n| *n == s.target)
-                    .unwrap()]
-                .id(),
-                distance: s.distance,
-                receptors: s.receptors,
-                impulses: vec![],
-                inactivity: 0.0,
+                    .unwrap();
+                #[cfg(not(feature = "parallel"))]
+                let nindex = neuron_indices.iter().position(|n| *n == s.target).unwrap();
+                Synapse {
+                    source: neurons[sindex].id(),
+                    target: neurons[nindex].id(),
+                    distance: s.distance,
+                    receptors: s.receptors,
+                    impulses: vec![],
+                    inactivity: 0.0,
+                }
             })
             .collect::<Vec<_>>();
-        let sensors = self
-            .sensors
-            .par_iter()
-            .map(|s| Sensor {
-                id: s.id,
-                target: neurons[neuron_indices
+        let sensors = iter!(self.sensors)
+            .map(|s| {
+                #[cfg(feature = "parallel")]
+                let index = neuron_indices
                     .par_iter()
                     .position_any(|n| *n == s.target)
-                    .unwrap()]
-                .id(),
+                    .unwrap();
+                #[cfg(not(feature = "parallel"))]
+                let index = neuron_indices.iter().position(|n| *n == s.target).unwrap();
+                Sensor {
+                    id: s.id,
+                    target: neurons[index].id(),
+                }
             })
             .collect::<Vec<_>>();
-        let effectors = self
-            .effectors
-            .par_iter()
-            .map(|e| Effector {
-                id: e.id,
-                source: neurons[neuron_indices
+        let effectors = iter!(self.effectors)
+            .map(|e| {
+                #[cfg(feature = "parallel")]
+                let index = neuron_indices
                     .par_iter()
                     .position_any(|n| *n == e.source)
-                    .unwrap()]
-                .id(),
-                potential: 0.0,
+                    .unwrap();
+                #[cfg(not(feature = "parallel"))]
+                let index = neuron_indices.iter().position(|n| *n == e.source).unwrap();
+                Effector {
+                    id: e.id,
+                    source: neurons[index].id(),
+                    potential: 0.0,
+                }
             })
             .collect::<Vec<_>>();
         Self {
@@ -238,17 +275,17 @@ impl Brain {
 
     #[inline]
     pub fn get_neurons(&self) -> Vec<NeuronID> {
-        self.neurons.par_iter().map(|n| n.id()).collect()
+        iter!(self.neurons).map(|n| n.id()).collect()
     }
 
     #[inline]
     pub fn get_sensors(&self) -> Vec<SensorID> {
-        self.sensors.par_iter().map(|s| s.id).collect()
+        iter!(self.sensors).map(|s| s.id).collect()
     }
 
     #[inline]
     pub fn get_effectors(&self) -> Vec<EffectorID> {
-        self.effectors.par_iter().map(|e| e.id).collect()
+        iter!(self.effectors).map(|e| e.id).collect()
     }
 
     #[inline]
@@ -258,20 +295,19 @@ impl Brain {
 
     #[inline]
     pub fn get_impulses_count(&self) -> usize {
-        self.synapses.par_iter().map(|s| s.impulses.len()).sum()
+        iter!(self.synapses).map(|s| s.impulses.len()).sum()
     }
 
     #[inline]
     pub fn get_impulses_potential(&self) -> Scalar {
-        self.synapses
-            .par_iter()
-            .map(|s| s.impulses.par_iter().map(|i| i.potential).sum::<Scalar>())
+        iter!(self.synapses)
+            .map(|s| iter!(s.impulses).map(|i| i.potential).sum::<Scalar>())
             .sum::<Scalar>()
     }
 
     #[inline]
     pub fn get_neurons_potential(&self) -> Scalar {
-        self.neurons.par_iter().map(|n| n.potential()).sum()
+        iter!(self.neurons).map(|n| n.potential()).sum()
     }
 
     #[inline]
@@ -303,12 +339,26 @@ impl Brain {
 
     #[inline]
     pub fn neuron(&self, id: NeuronID) -> Option<&Neuron> {
-        self.neurons.par_iter().find_any(|n| n.id() == id)
+        #[cfg(feature = "parallel")]
+        {
+            self.neurons.par_iter().find_any(|n| n.id() == id)
+        }
+        #[cfg(not(feature = "parallel"))]
+        {
+            self.neurons.iter().find(|n| n.id() == id)
+        }
     }
 
     #[inline]
     pub fn neuron_mut(&mut self, id: NeuronID) -> Option<&mut Neuron> {
-        self.neurons.par_iter_mut().find_any(|n| n.id() == id)
+        #[cfg(feature = "parallel")]
+        {
+            self.neurons.par_iter_mut().find_any(|n| n.id() == id)
+        }
+        #[cfg(not(feature = "parallel"))]
+        {
+            self.neurons.iter_mut().find(|n| n.id() == id)
+        }
     }
 
     #[inline]
@@ -318,45 +368,45 @@ impl Brain {
 
     #[inline]
     pub fn are_neurons_connected(&self, from: NeuronID, to: NeuronID) -> bool {
-        self.synapses
-            .par_iter()
-            .any(|s| s.source == from && s.target == to)
+        iter!(self.synapses).any(|s| s.source == from && s.target == to)
     }
 
     #[inline]
     pub fn does_neuron_has_connections(&self, id: NeuronID) -> bool {
-        self.synapses
-            .par_iter()
-            .any(|s| s.source == id || s.target == id)
+        iter!(self.synapses).any(|s| s.source == id || s.target == id)
     }
 
     #[inline]
     pub fn get_neuron_connections_count(&self, id: NeuronID) -> (usize, usize) {
-        let incoming = self.synapses.par_iter().filter(|s| s.target == id).count();
-        let outgoing = self.synapses.par_iter().filter(|s| s.source == id).count();
+        let incoming = iter!(self.synapses).filter(|s| s.target == id).count();
+        let outgoing = iter!(self.synapses).filter(|s| s.source == id).count();
         (incoming, outgoing)
     }
 
     #[inline]
     pub fn get_neuron_connections(&self, id: NeuronID) -> (Vec<NeuronID>, Vec<NeuronID>) {
-        let incoming = self
-            .synapses
-            .par_iter()
+        let incoming = iter!(self.synapses)
             .filter_map(|s| if s.target == id { Some(s.source) } else { None })
             .collect();
-        let outgoing = self
-            .synapses
-            .par_iter()
+        let outgoing = iter!(self.synapses)
             .filter_map(|s| if s.source == id { Some(s.target) } else { None })
             .collect();
         (incoming, outgoing)
     }
 
     pub fn create_sensor(&mut self, target: NeuronID) -> Result<SensorID> {
-        if let Some(sensor) = self.sensors.par_iter().find_any(|s| s.target == target) {
+        #[cfg(feature = "parallel")]
+        let sensor = self.sensors.par_iter().find_any(|s| s.target == target);
+        #[cfg(not(feature = "parallel"))]
+        let sensor = self.sensors.iter().find(|s| s.target == target);
+        if let Some(sensor) = sensor {
             return Err(Error::NeuronIsAlreadyConnectedToSensor(target, sensor.id));
         }
-        if let Some(effector) = self.effectors.par_iter().find_any(|e| e.source == target) {
+        #[cfg(feature = "parallel")]
+        let effector = self.effectors.par_iter().find_any(|e| e.source == target);
+        #[cfg(not(feature = "parallel"))]
+        let effector = self.effectors.iter().find(|e| e.source == target);
+        if let Some(effector) = effector {
             return Err(Error::NeuronIsAlreadyConnectedToEffector(
                 target,
                 effector.id,
@@ -372,7 +422,11 @@ impl Brain {
     }
 
     pub fn kill_sensor(&mut self, id: SensorID) -> Result<()> {
-        if let Some(index) = self.sensors.par_iter().position_any(|s| s.id == id) {
+        #[cfg(feature = "parallel")]
+        let index = self.sensors.par_iter().position_any(|s| s.id == id);
+        #[cfg(not(feature = "parallel"))]
+        let index = self.sensors.iter().position(|s| s.id == id);
+        if let Some(index) = index {
             self.sensors.swap_remove(index);
             Ok(())
         } else {
@@ -381,12 +435,19 @@ impl Brain {
     }
 
     pub fn sensor_trigger_impulse(&mut self, id: SensorID, potential: Scalar) -> Result<()> {
-        if let Some(sensor) = self.sensors.par_iter().find_any(|s| s.id == id) {
-            if let Some(neuron) = self
+        #[cfg(feature = "parallel")]
+        let sensor = self.sensors.par_iter().find_any(|s| s.id == id);
+        #[cfg(not(feature = "parallel"))]
+        let sensor = self.sensors.iter().find(|s| s.id == id);
+        if let Some(sensor) = sensor {
+            #[cfg(feature = "parallel")]
+            let neuron = self
                 .neurons
                 .par_iter_mut()
-                .find_any(|n| n.id() == sensor.target)
-            {
+                .find_any(|n| n.id() == sensor.target);
+            #[cfg(not(feature = "parallel"))]
+            let neuron = self.neurons.iter_mut().find(|n| n.id() == sensor.target);
+            if let Some(neuron) = neuron {
                 neuron.push_potential(potential);
                 Ok(())
             } else {
@@ -398,10 +459,18 @@ impl Brain {
     }
 
     pub fn create_effector(&mut self, source: NeuronID) -> Result<EffectorID> {
-        if let Some(sensor) = self.sensors.par_iter().find_any(|s| s.target == source) {
+        #[cfg(feature = "parallel")]
+        let sensor = self.sensors.par_iter().find_any(|s| s.target == source);
+        #[cfg(not(feature = "parallel"))]
+        let sensor = self.sensors.iter().find(|s| s.target == source);
+        if let Some(sensor) = sensor {
             return Err(Error::NeuronIsAlreadyConnectedToSensor(source, sensor.id));
         }
-        if let Some(effector) = self.effectors.par_iter().find_any(|e| e.source == source) {
+        #[cfg(feature = "parallel")]
+        let effector = self.effectors.par_iter().find_any(|e| e.source == source);
+        #[cfg(not(feature = "parallel"))]
+        let effector = self.effectors.iter().find(|e| e.source == source);
+        if let Some(effector) = effector {
             return Err(Error::NeuronIsAlreadyConnectedToEffector(
                 source,
                 effector.id,
@@ -418,7 +487,11 @@ impl Brain {
     }
 
     pub fn kill_effector(&mut self, id: EffectorID) -> Result<()> {
-        if let Some(index) = self.effectors.par_iter().position_any(|e| e.id == id) {
+        #[cfg(feature = "parallel")]
+        let index = self.effectors.par_iter().position_any(|e| e.id == id);
+        #[cfg(not(feature = "parallel"))]
+        let index = self.effectors.iter().position(|e| e.id == id);
+        if let Some(index) = index {
             self.effectors.swap_remove(index);
             Ok(())
         } else {
@@ -427,7 +500,11 @@ impl Brain {
     }
 
     pub fn effector_potential_release(&mut self, id: EffectorID) -> Result<Scalar> {
-        if let Some(effector) = self.effectors.par_iter_mut().find_any(|e| e.id == id) {
+        #[cfg(feature = "parallel")]
+        let effector = self.effectors.par_iter_mut().find_any(|e| e.id == id);
+        #[cfg(not(feature = "parallel"))]
+        let effector = self.effectors.iter_mut().find(|e| e.id == id);
+        if let Some(effector) = effector {
             let potential = effector.potential;
             effector.potential = 0.0;
             Ok(potential)
@@ -444,7 +521,11 @@ impl Brain {
     }
 
     pub fn kill_neuron(&mut self, id: NeuronID) -> Result<()> {
-        if let Some(index) = self.neurons.par_iter().position_any(|n| n.id() == id) {
+        #[cfg(feature = "parallel")]
+        let index = self.neurons.par_iter().position_any(|n| n.id() == id);
+        #[cfg(not(feature = "parallel"))]
+        let index = self.neurons.iter().position(|n| n.id() == id);
+        if let Some(index) = index {
             self.neurons.swap_remove(index);
             while let Some(index) = self
                 .synapses
@@ -453,10 +534,18 @@ impl Brain {
             {
                 self.synapses.swap_remove(index);
             }
-            while let Some(index) = self.sensors.par_iter().position_any(|s| s.target == id) {
+            #[cfg(feature = "parallel")]
+            let index = self.sensors.par_iter().position_any(|s| s.target == id);
+            #[cfg(not(feature = "parallel"))]
+            let index = self.sensors.iter().position(|s| s.target == id);
+            while let Some(index) = index {
                 self.sensors.swap_remove(index);
             }
-            while let Some(index) = self.effectors.par_iter().position_any(|e| e.source == id) {
+            #[cfg(feature = "parallel")]
+            let index = self.effectors.par_iter().position_any(|e| e.source == id);
+            #[cfg(not(feature = "parallel"))]
+            let index = self.effectors.iter().position(|e| e.source == id);
+            while let Some(index) = index {
                 self.effectors.swap_remove(index);
             }
             Ok(())
@@ -474,10 +563,18 @@ impl Brain {
                 if self.are_neurons_connected(from, to) {
                     return Ok(None);
                 }
-                if let Some(sensor) = self.sensors.par_iter().find_any(|s| s.target == to) {
+                #[cfg(feature = "parallel")]
+                let sensor = self.sensors.par_iter().find_any(|s| s.target == to);
+                #[cfg(not(feature = "parallel"))]
+                let sensor = self.sensors.iter().find(|s| s.target == to);
+                if let Some(sensor) = sensor {
                     return Err(Error::BindingNeuronToSensor(to, sensor.id));
                 }
-                if let Some(effector) = self.effectors.par_iter().find_any(|e| e.source == from) {
+                #[cfg(feature = "parallel")]
+                let effector = self.effectors.par_iter().find_any(|e| e.source == from);
+                #[cfg(not(feature = "parallel"))]
+                let effector = self.effectors.iter().find(|e| e.source == from);
+                if let Some(effector) = effector {
                     return Err(Error::BindingEffectorToNeuron(effector.id, from));
                 }
                 let distance = source.position().distance(target.position());
@@ -506,13 +603,19 @@ impl Brain {
         if from == to {
             return Err(Error::UnbindingNeuronFromItSelf(from));
         }
-        if self.neurons.par_iter().any(|n| n.id() == from) {
-            if self.neurons.par_iter().any(|n| n.id() == to) {
-                if let Some(index) = self
+        if iter!(self.neurons).any(|n| n.id() == from) {
+            if iter!(self.neurons).any(|n| n.id() == to) {
+                #[cfg(feature = "parallel")]
+                let index = self
                     .synapses
                     .par_iter()
-                    .position_any(|s| s.source == from && s.target == to)
-                {
+                    .position_any(|s| s.source == from && s.target == to);
+                #[cfg(not(feature = "parallel"))]
+                let index = self
+                    .synapses
+                    .iter()
+                    .position(|s| s.source == from && s.target == to);
+                if let Some(index) = index {
                     self.synapses.swap_remove(index);
                     Ok(true)
                 } else {
@@ -559,9 +662,7 @@ impl Brain {
         // potential summation phase.
         {
             let dtpd = delta_time * neuron_potential_decay;
-            let neurons_triggering = self
-                .neurons
-                .par_iter_mut()
+            let neurons_triggering = iter_mut!(self.neurons)
                 .filter_map(|neuron| {
                     let potential = neuron.potential();
                     let status = if potential >= action_potential_treshold {
@@ -579,15 +680,12 @@ impl Brain {
                 })
                 .collect::<Vec<_>>();
             for (id, p) in neurons_triggering {
-                let count = self
-                    .synapses
-                    .par_iter()
+                let count = iter!(self.synapses)
                     .filter(|s| s.inactivity <= 0.0 && s.source == id)
                     .count();
                 if count > 0 {
                     let p = p / count as Scalar;
-                    self.synapses
-                        .par_iter_mut()
+                    iter_mut!(self.synapses)
                         .filter(|s| s.inactivity <= 0.0 && s.source == id)
                         .for_each(|s| {
                             let under = if let Some(o) = synapse_overdose_receptors {
@@ -612,9 +710,7 @@ impl Brain {
             let s = propagation_speed * delta_time;
             let r = receptors_excitation * delta_time;
             let d = synapse_propagation_decay * s;
-            let neurons_to_trigger = self
-                .synapses
-                .par_iter_mut()
+            let neurons_to_trigger = iter_mut!(self.synapses)
                 .flat_map(|synapse| {
                     let mut estimated_count = 0;
                     for impulse in &mut synapse.impulses {
@@ -646,7 +742,7 @@ impl Brain {
                     neurons_to_trigger
                 })
                 .collect::<Vec<_>>();
-            self.neurons.par_iter_mut().for_each(|neuron| {
+            iter_mut!(self.neurons).for_each(|neuron| {
                 let nid = neuron.id();
                 for (id, potential) in &neurons_to_trigger {
                     if nid == *id {
@@ -659,9 +755,7 @@ impl Brain {
         // inhibition and reconnection phase.
         if receptors_inhibition > 0.0 {
             let r = receptors_inhibition * delta_time;
-            let synapses_to_remove = self
-                .synapses
-                .par_iter_mut()
+            let synapses_to_remove = iter_mut!(self.synapses)
                 .enumerate()
                 .filter_map(|(i, synapse)| {
                     synapse.receptors -= r;
@@ -672,14 +766,15 @@ impl Brain {
                     }
                 })
                 .collect::<Vec<_>>();
-            let neurons_to_reconnect = synapses_to_remove
-                .par_iter()
+            let neurons_to_reconnect = iter!(synapses_to_remove)
                 .filter_map(|index| {
                     let s = &self.synapses[*index];
                     if s.receptors <= 0.0 {
-                        if let Some(neuron) =
-                            self.neurons.par_iter().find_any(|n| n.id() == s.source)
-                        {
+                        #[cfg(feature = "parallel")]
+                        let neuron = self.neurons.par_iter().find_any(|n| n.id() == s.source);
+                        #[cfg(not(feature = "parallel"))]
+                        let neuron = self.neurons.iter().find(|n| n.id() == s.source);
+                        if let Some(neuron) = neuron {
                             let mut rng = thread_rng();
                             if let Some(id) = self.select_neuron(neuron.position(), &mut rng) {
                                 if s.source != id
@@ -704,17 +799,11 @@ impl Brain {
 
         // removing dead neurons phase.
         {
-            let neurons_to_remove = self
-                .neurons
-                .par_iter()
+            let neurons_to_remove = iter!(self.neurons)
                 .enumerate()
                 .filter_map(|(i, n)| {
                     let id = n.id();
-                    if !self
-                        .synapses
-                        .par_iter()
-                        .any(|s| s.source == id || s.target == id)
-                    {
+                    if !iter!(self.synapses).any(|s| s.source == id || s.target == id) {
                         Some(i)
                     } else {
                         None
@@ -723,17 +812,31 @@ impl Brain {
                 .collect::<Vec<_>>();
             for index in neurons_to_remove.into_iter().rev() {
                 let id = self.neurons.swap_remove(index).id();
-                while let Some(index) = self
+                #[cfg(feature = "parallel")]
+                let index = self
                     .synapses
                     .par_iter()
-                    .position_any(|s| s.source == id || s.target == id)
-                {
+                    .position_any(|s| s.source == id || s.target == id);
+                #[cfg(not(feature = "parallel"))]
+                let index = self
+                    .synapses
+                    .iter()
+                    .position(|s| s.source == id || s.target == id);
+                while let Some(index) = index {
                     self.synapses.swap_remove(index);
                 }
-                while let Some(index) = self.sensors.par_iter().position_any(|s| s.target == id) {
+                #[cfg(feature = "parallel")]
+                let index = self.sensors.par_iter().position_any(|s| s.target == id);
+                #[cfg(not(feature = "parallel"))]
+                let index = self.sensors.iter().position(|s| s.target == id);
+                while let Some(index) = index {
                     self.sensors.swap_remove(index);
                 }
-                while let Some(index) = self.effectors.par_iter().position_any(|e| e.source == id) {
+                #[cfg(feature = "parallel")]
+                let index = self.effectors.par_iter().position_any(|e| e.source == id);
+                #[cfg(not(feature = "parallel"))]
+                let index = self.effectors.iter().position(|e| e.source == id);
+                while let Some(index) = index {
                     self.effectors.swap_remove(index);
                 }
             }
@@ -742,11 +845,14 @@ impl Brain {
         // accumulating effector potentials phase.
         {
             for effector in &mut self.effectors {
-                if let Some(neuron) = self
+                #[cfg(feature = "parallel")]
+                let neuron = self
                     .neurons
                     .par_iter()
-                    .find_any(|n| n.id() == effector.source)
-                {
+                    .find_any(|n| n.id() == effector.source);
+                #[cfg(not(feature = "parallel"))]
+                let neuron = self.neurons.iter().find(|n| n.id() == effector.source);
+                if let Some(neuron) = neuron {
                     effector.potential = neuron.potential();
                 }
             }
@@ -754,9 +860,7 @@ impl Brain {
 
         // creating new connections phase.
         if let Some(r) = synapse_new_connection_receptors {
-            let synapses_to_connect = self
-                .synapses
-                .par_iter()
+            let synapses_to_connect = iter!(self.synapses)
                 .enumerate()
                 .filter_map(|(i, s)| {
                     if s.receptors > r {
@@ -790,11 +894,9 @@ impl Brain {
         R: Rng,
     {
         let srr = self.config.synapse_reconnection_range;
-        let filtered = self
-            .neurons
-            .par_iter()
+        let filtered = iter!(self.neurons)
             .filter_map(|neuron| {
-                if self.sensors.par_iter().any(|s| s.target == neuron.id()) {
+                if iter!(self.sensors).any(|s| s.target == neuron.id()) {
                     return None;
                 }
                 if let Some(srr) = srr {
@@ -819,8 +921,7 @@ impl Brain {
 
     pub fn build_activity_map(&self, flags: usize) -> BrainActivityMap {
         let connections = if flags & activity::CONNECTIONS != 0 {
-            self.synapses
-                .par_iter()
+            iter!(self.synapses)
                 .map(|s| {
                     let from = self.neuron(s.source).unwrap().position();
                     let to = self.neuron(s.target).unwrap().position();
@@ -831,14 +932,12 @@ impl Brain {
             vec![]
         };
         let impulses = if flags & activity::IMPULSES != 0 {
-            self.synapses
-                .par_iter()
+            iter!(self.synapses)
                 .map(|s| {
                     let from = self.neuron(s.source).unwrap().position();
                     let to = self.neuron(s.target).unwrap().position();
                     let distance = from.distance(to);
-                    s.impulses
-                        .iter()
+                    iter!(s.impulses)
                         .map(|i| {
                             let factor = if distance > 0.0 {
                                 1.0 - i.timeout.max(0.0).min(distance) / distance
@@ -855,23 +954,21 @@ impl Brain {
             vec![]
         };
         let sensors = if flags & activity::SENSORS != 0 {
-            self.sensors
-                .par_iter()
+            iter!(self.sensors)
                 .map(|s| self.neuron(s.target).unwrap().position())
                 .collect()
         } else {
             vec![]
         };
         let effectors = if flags & activity::EFFECTORS != 0 {
-            self.effectors
-                .par_iter()
+            iter!(self.effectors)
                 .map(|e| self.neuron(e.source).unwrap().position())
                 .collect()
         } else {
             vec![]
         };
         let neurons = if flags & activity::NEURONS != 0 {
-            self.neurons.par_iter().map(|n| n.position()).collect()
+            iter!(self.neurons).map(|n| n.position()).collect()
         } else {
             vec![]
         };
@@ -887,65 +984,61 @@ impl Brain {
 
     pub fn build_activity_stats(&self) -> BrainActivityStats {
         let neurons_potential = self.get_neurons_potential();
-        let neurons_potential_min = self
-            .neurons
-            .par_iter()
+        let neurons_potential_min = iter!(self.neurons)
             .map(|n| n.potential())
             .min_by(|a, b| a.partial_cmp(&b).unwrap())
             .unwrap_or(0.0);
-        let neurons_potential_max = self
-            .neurons
-            .par_iter()
+        let neurons_potential_max = iter!(self.neurons)
             .map(|n| n.potential())
             .max_by(|a, b| a.partial_cmp(&b).unwrap())
             .unwrap_or(0.0);
         let impulses_potential = self.get_impulses_potential();
-        let impulses_potential_min = self
-            .synapses
-            .par_iter()
+        let impulses_potential_min = iter!(self.synapses)
             .map(|s| {
-                s.impulses
-                    .par_iter()
+                iter!(s.impulses)
                     .map(|i| i.potential)
                     .min_by(|a, b| a.partial_cmp(&b).unwrap())
                     .unwrap_or(0.0)
             })
             .min_by(|a, b| a.partial_cmp(&b).unwrap())
             .unwrap_or(0.0);
-        let impulses_potential_max = self
-            .synapses
-            .par_iter()
+        let impulses_potential_max = iter!(self.synapses)
             .map(|s| {
-                s.impulses
-                    .par_iter()
+                iter!(s.impulses)
                     .map(|i| i.potential)
                     .max_by(|a, b| a.partial_cmp(&b).unwrap())
                     .unwrap_or(0.0)
             })
             .max_by(|a, b| a.partial_cmp(&b).unwrap())
             .unwrap_or(0.0);
-        let neuron_connections = self
-            .neurons
-            .par_iter()
+        let neuron_connections = iter!(self.neurons)
             .map(|n| self.get_neuron_connections_count(n.id()))
             .collect::<Vec<_>>();
+        #[cfg(feature = "parallel")]
         let neuron_connections_min = neuron_connections
             .par_iter()
             .cloned()
             .reduce(|| (0, 0), |a, b| (a.0.min(b.0), a.1.min(b.1)));
+        #[cfg(not(feature = "parallel"))]
+        let neuron_connections_min = neuron_connections
+            .iter()
+            .cloned()
+            .fold((0, 0), |a, b| (a.0.min(b.0), a.1.min(b.1)));
+        #[cfg(feature = "parallel")]
         let neuron_connections_max = neuron_connections
             .par_iter()
             .cloned()
             .reduce(|| (0, 0), |a, b| (a.0.max(b.0), a.1.max(b.1)));
-        let synapses_receptors_min = self
-            .synapses
-            .par_iter()
+        #[cfg(not(feature = "parallel"))]
+        let neuron_connections_max = neuron_connections
+            .iter()
+            .cloned()
+            .fold((0, 0), |a, b| (a.0.max(b.0), a.1.max(b.1)));
+        let synapses_receptors_min = iter!(self.synapses)
             .map(|s| s.receptors)
             .min_by(|a, b| a.partial_cmp(&b).unwrap())
             .unwrap_or(0.0);
-        let synapses_receptors_max = self
-            .synapses
-            .par_iter()
+        let synapses_receptors_max = iter!(self.synapses)
             .map(|s| s.receptors)
             .max_by(|a, b| a.partial_cmp(&b).unwrap())
             .unwrap_or(0.0);

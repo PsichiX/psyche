@@ -1,6 +1,6 @@
 [package]
 name = "psyche"
-version = "0.2.17"
+version = "0.2.18"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 edition = "2018"
 description = "Psyche AI Toolset"
@@ -17,6 +17,15 @@ exclude = [
   "dist/**",
   "unity/**",
   "godot/**",
+]
+
+[features]
+# default = ["parallel"]
+parallel = [
+  "psyche-core/parallel",
+  "psyche-serde/parallel",
+  "psyche-host/parallel",
+  "psyche-graphics/parallel",
 ]
 
 [dependencies]

@@ -2,8 +2,9 @@ use psyche::core::{
     brain::Brain, brain_builder::BrainBuilder, config::Config as BrainConfig,
     offspring_builder::OffspringBuilder,
 };
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct SimulationData {
     pub brain_scored: (Brain, f32),
     pub last_scored: Option<(Brain, f32)>,
@@ -12,7 +13,7 @@ pub struct SimulationData {
 impl Default for SimulationData {
     fn default() -> Self {
         let mut config = BrainConfig::default();
-        config.propagation_speed = 50.0;
+        config.propagation_speed = 1000.0;
         config.synapse_reconnection_range = Some(15.0);
         config.neuron_potential_decay = 0.1;
         config.synapse_propagation_decay = 0.01;
@@ -46,6 +47,16 @@ impl SimulationData {
             .new_effectors(0);
 
         if score > self.brain_scored.1 || self.last_scored.is_none() {
+            println!("score = {}", score);
+            println!("curr score = {}", self.brain_scored.1);
+            println!(
+                "score > self.brain_scored.1 = {}",
+                score > self.brain_scored.1
+            );
+            println!(
+                "self.last_scored.is_none() = {}",
+                self.last_scored.is_none()
+            );
             self.last_scored = Some(self.brain_scored.clone());
             self.brain_scored = (offspring_builder.build_mutated(&self.brain_scored.0), score);
             true
