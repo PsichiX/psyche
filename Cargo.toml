@@ -1,6 +1,6 @@
 [package]
 name = "psyche"
-version = "0.2.18"
+version = "0.2.19"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 edition = "2018"
 description = "Psyche AI Toolset"
@@ -47,8 +47,6 @@ members = [
   "psyche-amethyst",
 ]
 exclude = [
-  "demos",
-  "amethyst-demo",
   "media",
   "cpp",
   "dotnet",

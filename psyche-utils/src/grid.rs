@@ -1,6 +1,7 @@
 //! Tool used to store and sample grid-like data.
 
 use crate::Scalar;
+use serde::{Deserialize, Serialize};
 use std::ops::{Add, Index, IndexMut, Mul};
 
 /// Collection that holds data in 2d grid-like manner.
@@ -9,7 +10,7 @@ use std::ops::{Add, Index, IndexMut, Mul};
 /// - filled with same value for all fields;
 /// - filled with values got from closure that produces value for each field individually;
 /// - sampled with any type that implements `GridSampler` trai.
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct Grid<T> {
     cols: usize,
     rows: usize,

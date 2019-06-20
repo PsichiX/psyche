@@ -51,6 +51,6 @@ impl SimpleState for LoadingState {
     }
 
     fn update(&mut self, _data: &mut StateData<'_, GameData<'_, '_>>) -> SimpleTrans {
-        Trans::Push(Box::new(SimulationState::default()))
+        Trans::Switch(Box::new(SimulationState::default()))
     }
 }

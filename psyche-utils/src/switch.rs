@@ -1,5 +1,7 @@
 //! Tool used to sequentialy switch between many options of same data.
 
+use serde::{Deserialize, Serialize};
+
 /// Collection that contains several versions/options of data so you can switch between them in
 /// sequential manner. It can be used to produce next data frame based on previous data frame.
 ///
@@ -18,6 +20,7 @@
 /// }
 /// assert_eq!(switch.get().unwrap(), &vec![3, 7, 6]);
 /// ```
+#[derive(Serialize, Deserialize)]
 pub struct Switch<T> {
     index: usize,
     options: Vec<T>,
